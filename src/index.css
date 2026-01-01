@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-border: 214.3 31.8% 91.4%;
+  --color-input: 214.3 31.8% 91.4%;
+  --color-ring: 222.2 84% 4.9%;
+  --color-background: 0 0% 100%;
+  --color-foreground: 222.2 84% 4.9%;
+  --color-primary: 222.2 47.4% 11.2%;
+  --color-primary-foreground: 210 40% 98%;
+  --color-secondary: 210 40% 96.1%;
+  --color-secondary-foreground: 222.2 47.4% 11.2%;
+  --color-muted: 210 40% 96.1%;
+  --color-muted-foreground: 215.4 16.3% 46.9%;
+  --color-accent: 210 40% 96.1%;
+  --color-accent-foreground: 222.2 47.4% 11.2%;
+  --color-card: 0 0% 100%;
+  --color-card-foreground: 222.2 84% 4.9%;
+  --color-destructive: 0 84.2% 60.2%;
+  --color-destructive-foreground: 210 40% 98%;
+  --color-popover: 0 0% 100%;
+  --color-popover-foreground: 222.2 84% 4.9%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+    @apply disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-primary-foreground;
+    @apply hover:bg-primary/90 h-10 px-4 py-2;
+  }
+
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground;
+    @apply hover:bg-secondary/80 h-10 px-4 py-2;
+  }
+
+  .btn-outline {
+    @apply border border-input bg-background;
+    @apply hover:bg-accent hover:text-accent-foreground;
+    @apply h-10 px-4 py-2;
+  }
+
+  .btn-ghost {
+    @apply hover:bg-accent hover:text-accent-foreground;
+    @apply h-10 px-4 py-2;
+  }
+
+  .card {
+    @apply rounded-lg border border-border;
+    @apply bg-card text-card-foreground shadow-sm;
+  }
+
+  .input {
+    @apply flex h-10 w-full rounded-md border border-input;
+    @apply bg-background px-3 py-2 text-sm;
+    @apply placeholder:text-muted-foreground;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+    @apply disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .textarea {
+    @apply flex min-h-[80px] w-full rounded-md border border-input;
+    @apply bg-background px-3 py-2 text-sm;
+    @apply placeholder:text-muted-foreground;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+    @apply disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .label {
+    @apply text-sm font-medium leading-none;
+    @apply peer-disabled:cursor-not-allowed peer-disabled:opacity-70;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full border border-transparent;
+    @apply px-2.5 py-0.5 text-xs font-semibold transition-colors;
+    @apply focus:outline-none focus:ring-2 focus:ring-ring;
+  }
+
+  .badge-default {
+    @apply bg-primary text-primary-foreground;
+    @apply hover:bg-primary/80;
+  }
+
+  .badge-secondary {
+    @apply bg-secondary text-secondary-foreground;
+    @apply hover:bg-secondary/80;
+  }
+
+  .badge-outline {
+    @apply border-border text-foreground;
+  }
+
+  .badge-success {
+    @apply bg-green-100 text-green-800 border-green-200;
+  }
+
+  .badge-warning {
+    @apply bg-yellow-100 text-yellow-800 border-yellow-200;
+  }
+
+  .badge-info {
+    @apply bg-blue-100 text-blue-800 border-blue-200;
+  }
+
+  .badge-danger {
+    @apply bg-red-100 text-red-800 border-red-200;
+  }
+
+  .skeleton {
+    @apply animate-pulse bg-muted rounded-md;
+  }
+}
+
+
+
+
