@@ -1,8 +1,53 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { User, Camera, MapPin, Calendar, Edit, Mail, Phone, Linkedin, Github, Globe, FileText, Download, Upload, LayoutDashboard, Bookmark, GraduationCap } from 'lucide-react';
+import { User, Camera, MapPin, Calendar, Edit, Mail, Phone, Linkedin, Github, Globe, FileText, Download, Upload, LayoutDashboard, Bookmark, GraduationCap, Loader2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const UserProfile = () => {
+  const { user } = useAuth();
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('http://localhost:5000/api/users/profile', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setProfile(data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <h1 className="text-2xl font-bold">Profile not found</h1>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Profile Header */}
@@ -10,31 +55,35 @@ const UserProfile = () => {
         <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
           {/* Profile Photo */}
           <div className="relative flex-shrink-0">
-            <div className="h-32 w-32 rounded-full bg-secondary flex items-center justify-center">
-              <User className="h-16 w-16 text-primary" />
+            <div className="h-32 w-32 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+              {profile.profilePictureUrl ? (
+                <img src={profile.profilePictureUrl} alt={profile.name} className="h-full w-full object-cover" />
+              ) : (
+                <User className="h-16 w-16 text-primary" />
+              )}
             </div>
-            <div className="absolute bottom-0 right-0 h-10 w-10 rounded-full bg-primary flex items-center justify-center border-4 border-white">
+            {/* <div className="absolute bottom-0 right-0 h-10 w-10 rounded-full bg-primary flex items-center justify-center border-4 border-white">
               <Camera className="h-5 w-5 text-white" />
-            </div>
+            </div> */}
           </div>
 
           {/* Profile Info */}
           <div className="flex-1">
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-3">
               <div>
-                <h1 className="text-3xl font-bold mb-2">John Doe</h1>
+                <h1 className="text-3xl font-bold mb-2">{profile.name}</h1>
                 <p className="text-lg text-muted-foreground mb-2">
-                  Full Stack Developer
+                  {profile.title || 'Job Seeker'}
                 </p>
                 <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <MapPin className="h-4 w-4" />
-                    San Francisco, CA
+                    {profile.location || 'Location not set'}
                   </span>
                   <span>•</span>
                   <span className="flex items-center gap-1">
                     <Calendar className="h-4 w-4" />
-                    Member since Jan 2024
+                    Member since {new Date(profile.createdAt).toLocaleDateString()}
                   </span>
                 </div>
               </div>
@@ -44,221 +93,167 @@ const UserProfile = () => {
               </Link>
             </div>
 
-            {/* Quick Stats */}
-            <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border">
+            {/* Quick Stats - Optional, if we have stats endpoint */}
+            {/* <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border">
               <div>
                 <p className="text-2xl font-bold text-primary">12</p>
                 <p className="text-sm text-muted-foreground">Applications</p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-primary">5</p>
-                <p className="text-sm text-muted-foreground">In Review</p>
+                <p className="text-sm text-muted-foreground">Interviews</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-primary">18</p>
+                <p className="text-2xl font-bold text-primary">8</p>
                 <p className="text-sm text-muted-foreground">Saved Jobs</p>
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Content Column */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-8">
           {/* About */}
-          <div className="card p-6">
-            <h2 className="text-xl font-semibold mb-4">About</h2>
-            <p className="text-foreground leading-relaxed">
-              Experienced Full Stack Developer with 5+ years of expertise in building scalable web applications. Passionate about creating clean, efficient code and delivering exceptional user experiences. Strong background in React, Node.js, and cloud technologies.
-            </p>
-          </div>
-
-          {/* Contact Information */}
-          <div className="card p-6">
-            <h2 className="text-xl font-semibold mb-4">Contact Information</h2>
-            <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
-                  <Mail className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Email</p>
-                  <p className="font-medium">john.doe@example.com</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
-                  <Phone className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Phone</p>
-                  <p className="font-medium">+1 (415) 555-0123</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
-                  <MapPin className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Location</p>
-                  <p className="font-medium">San Francisco, CA 94102</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
-                  <Linkedin className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">LinkedIn</p>
-                  <Link to="#" className="font-medium text-primary hover:underline">
-                    linkedin.com/in/johndoe
-                  </Link>
-                </div>
-              </div>
+          <section className="card p-6">
+            <h2 className="text-xl font-bold mb-4">About Me</h2>
+            <div className="prose max-w-none text-muted-foreground">
+              <p>{profile.bio || 'No bio added yet.'}</p>
             </div>
-          </div>
+          </section>
 
           {/* Skills */}
-          <div className="card p-6">
-            <h2 className="text-xl font-semibold mb-4">Skills</h2>
+          <section className="card p-6">
+            <h2 className="text-xl font-bold mb-4">Skills</h2>
             <div className="flex flex-wrap gap-2">
-              {['JavaScript', 'TypeScript', 'React', 'Node.js', 'Express', 'MongoDB', 'PostgreSQL', 'Git', 'Docker', 'AWS', 'REST API', 'GraphQL'].map((skill) => (
-                <span key={skill} className="badge badge-secondary">{skill}</span>
-              ))}
+              {profile.skills && profile.skills.length > 0 ? (
+                profile.skills.map((skill, index) => (
+                  <span key={index} className="badge badge-secondary">
+                    {skill}
+                  </span>
+                ))
+              ) : (
+                <p className="text-muted-foreground">No skills added yet.</p>
+              )}
             </div>
-          </div>
+          </section>
 
-          {/* Experience */}
-          <div className="card p-6">
-            <h2 className="text-xl font-semibold mb-4">Work Experience</h2>
+          {/* Experience - Placeholder */}
+          {/* <section className="card p-6">
+            <h2 className="text-xl font-bold mb-6">Work Experience</h2>
             <div className="space-y-6">
-              {/* Experience 1 */}
-              <div className="relative pl-8 pb-6 border-l-2 border-border last:pb-0">
-                <div className="absolute -left-2 top-0 h-4 w-4 rounded-full bg-primary border-2 border-white"></div>
-                <div>
-                  <h3 className="font-semibold mb-1">Senior Full Stack Developer</h3>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    TechCorp Solutions • Full-time
-                  </p>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    Jan 2022 - Present • 2 years
-                  </p>
-                  <p className="text-sm text-foreground">
-                    Leading development of enterprise web applications using React and Node.js. Architecting scalable solutions and mentoring junior developers.
-                  </p>
-                </div>
-              </div>
-
-              {/* Experience 2 */}
-              <div className="relative pl-8 pb-6 border-l-2 border-border last:pb-0">
-                <div className="absolute -left-2 top-0 h-4 w-4 rounded-full bg-secondary border-2 border-white"></div>
-                <div>
-                  <h3 className="font-semibold mb-1">Full Stack Developer</h3>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    WebTech Industries • Full-time
-                  </p>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    Jun 2020 - Dec 2021 • 1.5 years
-                  </p>
-                  <p className="text-sm text-foreground">
-                    Developed and maintained multiple client projects using modern JavaScript frameworks. Collaborated with cross-functional teams to deliver high-quality solutions.
-                  </p>
-                </div>
+              <div className="border-l-2 border-border pl-4 ml-2">
+                <h3 className="font-semibold text-lg">Senior Full Stack Developer</h3>
+                <p className="text-primary font-medium">TechCorp Solutions</p>
+                <p className="text-sm text-muted-foreground mb-2">Jan 2022 - Present</p>
+                <p className="text-muted-foreground">
+                  Leading a team of 5 developers building scalable web applications using React and Node.js.
+                </p>
               </div>
             </div>
-          </div>
+          </section> */}
 
-          {/* Education */}
-          <div className="card p-6">
-            <h2 className="text-xl font-semibold mb-4">Education</h2>
-            <div className="space-y-4">
+          {/* Education - Placeholder */}
+          {/* <section className="card p-6">
+            <h2 className="text-xl font-bold mb-6">Education</h2>
+            <div className="space-y-6">
               <div className="flex gap-4">
                 <div className="h-12 w-12 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
                   <GraduationCap className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold mb-1">Bachelor of Science in Computer Science</h3>
-                  <p className="text-sm text-muted-foreground mb-1">Stanford University</p>
-                  <p className="text-xs text-muted-foreground">2016 - 2020</p>
+                  <h3 className="font-semibold text-lg">Bachelor of Science in Computer Science</h3>
+                  <p className="text-muted-foreground">Stanford University</p>
+                  <p className="text-sm text-muted-foreground">2016 - 2020</p>
                 </div>
               </div>
             </div>
-          </div>
+          </section> */}
         </div>
 
-        {/* Sidebar Column */}
-        <div className="lg:col-span-1 space-y-6">
+        {/* Sidebar */}
+        <aside className="space-y-6">
+          {/* Contact Info */}
+          <div className="card p-6">
+            <h3 className="font-semibold mb-4">Contact Information</h3>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center">
+                  <Mail className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Email</p>
+                  <p className="text-sm font-medium truncate max-w-[200px]">{profile.email}</p>
+                </div>
+              </div>
+              {profile.phone && (
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center">
+                    <Phone className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Phone</p>
+                    <p className="text-sm font-medium">{profile.phone}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 pt-6 border-t border-border">
+              <h4 className="text-sm font-medium mb-3">Social Profiles</h4>
+              <div className="flex gap-2">
+                {profile.socialLinks?.linkedin && (
+                  <a href={profile.socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="btn btn-outline h-8 w-8 p-0 rounded-full">
+                    <Linkedin className="h-4 w-4" />
+                  </a>
+                )}
+                {profile.socialLinks?.github && (
+                  <a href={profile.socialLinks.github} target="_blank" rel="noopener noreferrer" className="btn btn-outline h-8 w-8 p-0 rounded-full">
+                    <Github className="h-4 w-4" />
+                  </a>
+                )}
+                {profile.socialLinks?.portfolio && (
+                  <a href={profile.socialLinks.portfolio} target="_blank" rel="noopener noreferrer" className="btn btn-outline h-8 w-8 p-0 rounded-full">
+                    <Globe className="h-4 w-4" />
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Resume */}
           <div className="card p-6">
-            <h3 className="text-lg font-semibold mb-4">Resume</h3>
-            <div className="space-y-4">
-              <div className="p-4 bg-secondary rounded-lg">
+            <h3 className="font-semibold mb-4">Resume</h3>
+            {profile.resumeUrl ? (
+              <div className="p-4 bg-secondary rounded-lg mb-4">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="h-12 w-12 rounded-lg bg-white flex items-center justify-center flex-shrink-0">
-                    <FileText className="h-6 w-6 text-primary" />
+                  <div className="h-10 w-10 rounded-lg bg-white flex items-center justify-center">
+                    <FileText className="h-5 w-5 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">John_Doe_Resume.pdf</p>
-                    <p className="text-xs text-muted-foreground">Updated Nov 28, 2025</p>
+                    <p className="font-medium text-sm truncate">My Resume</p>
+                    <p className="text-xs text-muted-foreground">PDF</p>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Link to="#" className="btn btn-outline w-full text-xs h-9">
-                    <Download className="h-3 w-3 mr-2" />
-                    Download
-                  </Link>
-                </div>
+                <a href={profile.resumeUrl} target="_blank" rel="noopener noreferrer" className="btn btn-outline w-full text-sm h-9">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Resume
+                </a>
               </div>
-              <Link to="/job-seeker/edit-profile" className="btn btn-outline w-full">
-                <Upload className="h-4 w-4 mr-2" />
-                Update Resume
-              </Link>
-            </div>
+            ) : (
+              <div className="text-center py-6 bg-secondary/50 rounded-lg border border-dashed border-border">
+                <p className="text-sm text-muted-foreground mb-2">No resume uploaded</p>
+                <Link to="/job-seeker/edit-profile" className="text-sm text-primary hover:underline">
+                  Upload Resume
+                </Link>
+              </div>
+            )}
           </div>
-
-          {/* Social Links */}
-          <div className="card p-6">
-            <h3 className="text-lg font-semibold mb-4">Social Profiles</h3>
-            <div className="space-y-2">
-              <Link to="#" className="flex items-center gap-3 p-2 rounded-md hover:bg-accent transition-colors">
-                <Linkedin className="h-5 w-5 text-muted-foreground" />
-                <span className="text-sm font-medium">LinkedIn</span>
-              </Link>
-              <Link to="#" className="flex items-center gap-3 p-2 rounded-md hover:bg-accent transition-colors">
-                <Github className="h-5 w-5 text-muted-foreground" />
-                <span className="text-sm font-medium">GitHub</span>
-              </Link>
-              <Link to="#" className="flex items-center gap-3 p-2 rounded-md hover:bg-accent transition-colors">
-                <Globe className="h-5 w-5 text-muted-foreground" />
-                <span className="text-sm font-medium">Portfolio</span>
-              </Link>
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="card p-6">
-            <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-            <div className="space-y-2">
-              <Link to="/job-seeker/dashboard" className="btn btn-outline w-full justify-start">
-                <LayoutDashboard className="h-4 w-4 mr-2" />
-                View Dashboard
-              </Link>
-              <Link to="/job-seeker/applications" className="btn btn-outline w-full justify-start">
-                <FileText className="h-4 w-4 mr-2" />
-                My Applications
-              </Link>
-              <Link to="#" className="btn btn-outline w-full justify-start">
-                <Bookmark className="h-4 w-4 mr-2" />
-                Saved Jobs
-              </Link>
-            </div>
-          </div>
-        </div>
+        </aside>
       </div>
     </div>
   );
 };
 
 export default UserProfile;
-

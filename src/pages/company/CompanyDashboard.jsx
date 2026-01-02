@@ -1,14 +1,71 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Briefcase, Users, Clock, Star, ChevronRight, MapPin } from 'lucide-react';
+import { Briefcase, Users, Clock, Star, ChevronRight, MapPin, Loader2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const CompanyDashboard = () => {
+  const { user } = useAuth();
+  const [stats, setStats] = useState({
+    activeJobs: 0,
+    totalApplicants: 0,
+    pendingReviews: 0,
+    shortLists: 0
+  });
+  const [recentJobs, setRecentJobs] = useState([]);
+  const [recentApplicants, setRecentApplicants] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers = { 'Authorization': `Bearer ${token}` };
+
+        // Fetch Stats
+        const statsRes = await fetch('http://localhost:5000/api/companies/dashboard/stats', { headers });
+        const statsData = await statsRes.json();
+        if (statsData.success) {
+          setStats(statsData.data);
+        }
+
+        // Fetch Recent Jobs
+        const jobsRes = await fetch('http://localhost:5000/api/companies/jobs?limit=5&sort=newest', { headers });
+        const jobsData = await jobsRes.json();
+        if (jobsData.success) {
+          setRecentJobs(jobsData.data);
+        }
+
+        // Fetch Recent Applicants
+        const applicantsRes = await fetch('http://localhost:5000/api/companies/applicants?limit=5&sort=newest', { headers });
+        const applicantsData = await applicantsRes.json();
+        if (applicantsData.success) {
+          setRecentApplicants(applicantsData.data);
+        }
+
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Welcome Section */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">
-          Welcome back, TechCorp! 👋
+          Welcome back, {user?.name}! 👋
         </h1>
         <p className="text-muted-foreground">
           Here's what's happening with your job postings today
@@ -24,7 +81,7 @@ const CompanyDashboard = () => {
               <Briefcase className="h-6 w-6 text-blue-600" />
             </div>
           </div>
-          <h3 className="text-2xl font-bold mb-1">24</h3>
+          <h3 className="text-2xl font-bold mb-1">{stats.activeJobs}</h3>
           <p className="text-sm text-muted-foreground">Active Jobs</p>
         </div>
 
@@ -35,7 +92,7 @@ const CompanyDashboard = () => {
               <Users className="h-6 w-6 text-green-600" />
             </div>
           </div>
-          <h3 className="text-2xl font-bold mb-1">156</h3>
+          <h3 className="text-2xl font-bold mb-1">{stats.totalApplicants}</h3>
           <p className="text-sm text-muted-foreground">Total Applicants</p>
         </div>
 
@@ -46,7 +103,7 @@ const CompanyDashboard = () => {
               <Clock className="h-6 w-6 text-yellow-600" />
             </div>
           </div>
-          <h3 className="text-2xl font-bold mb-1">32</h3>
+          <h3 className="text-2xl font-bold mb-1">{stats.pendingReviews}</h3>
           <p className="text-sm text-muted-foreground">Pending Reviews</p>
         </div>
 
@@ -57,206 +114,88 @@ const CompanyDashboard = () => {
               <Star className="h-6 w-6 text-purple-600" />
             </div>
           </div>
-          <h3 className="text-2xl font-bold mb-1">18</h3>
-          <p className="text-sm text-muted-foreground">Shortlisted</p>
+          <h3 className="text-2xl font-bold mb-1">{stats.shortLists}</h3>
+          <p className="text-sm text-muted-foreground">Shortlisted Candidates</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Content Column */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Recent Jobs */}
-          <div className="card">
-            <div className="p-6 border-b border-border">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">Recent Job Posts</h2>
-                <Link to="/company/manage-jobs" className="text-sm text-primary hover:underline">
-                  View All
-                </Link>
-              </div>
-            </div>
-            <div className="divide-y divide-border">
-              {/* Job Item 1 */}
-              <div className="p-6 hover:bg-accent transition-colors">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <h3 className="font-semibold mb-1">
-                      <Link to="#" className="hover:text-primary">
-                        Senior Full Stack Developer
-                      </Link>
-                    </h3>
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Recent Job Posts */}
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold">Recent Job Posts</h2>
+            <Link to="/company/jobs" className="text-sm text-primary hover:underline flex items-center">
+              View All <ChevronRight className="h-4 w-4 ml-1" />
+            </Link>
+          </div>
+          <div className="space-y-4">
+            {recentJobs.length === 0 ? (
+              <p className="text-muted-foreground text-center py-4">No job posts yet.</p>
+            ) : (
+              recentJobs.map(job => (
+                <div key={job.id} className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent/50 transition-colors">
+                  <div>
+                    <h3 className="font-medium mb-1">{job.title}</h3>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
-                        <MapPin className="h-4 w-4" />
-                        San Francisco, CA
+                        <MapPin className="h-3 w-3" />
+                        {job.location}
                       </span>
-                      <span>•</span>
-                      <span>Full-time</span>
-                      <span>•</span>
-                      <span>Posted 2 days ago</span>
-                    </div>
-                  </div>
-                  <span className="badge badge-success">Active</span>
-                </div>
-                <div className="flex items-center justify-between mt-4">
-                  <div className="flex -space-x-2">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-8 w-8 rounded-full bg-secondary border-2 border-background flex items-center justify-center text-xs font-medium">
-                        {String.fromCharCode(64 + i)}
-                      </div>
-                    ))}
-                    <div className="h-8 w-8 rounded-full bg-secondary border-2 border-background flex items-center justify-center text-xs font-medium">
-                      +42
-                    </div>
-                  </div>
-                  <Link to="/company/applicants" className="btn btn-outline text-sm h-8">
-                    View Applicants
-                  </Link>
-                </div>
-              </div>
-
-              {/* Job Item 2 */}
-              <div className="p-6 hover:bg-accent transition-colors">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <h3 className="font-semibold mb-1">
-                      <Link to="#" className="hover:text-primary">
-                        UI/UX Designer
-                      </Link>
-                    </h3>
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
-                        <MapPin className="h-4 w-4" />
-                        Remote
+                        <Briefcase className="h-3 w-3" />
+                        {job.type}
                       </span>
-                      <span>•</span>
-                      <span>Contract</span>
-                      <span>•</span>
-                      <span>Posted 5 days ago</span>
                     </div>
                   </div>
-                  <span className="badge badge-success">Active</span>
-                </div>
-                <div className="flex items-center justify-between mt-4">
-                  <div className="flex -space-x-2">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-8 w-8 rounded-full bg-secondary border-2 border-background flex items-center justify-center text-xs font-medium">
-                        {String.fromCharCode(67 + i)}
-                      </div>
-                    ))}
-                    <div className="h-8 w-8 rounded-full bg-secondary border-2 border-background flex items-center justify-center text-xs font-medium">
-                      +28
-                    </div>
+                  <div className="text-right">
+                    <span className="text-lg font-bold text-primary">{job.applicants}</span>
+                    <p className="text-xs text-muted-foreground">Applicants</p>
                   </div>
-                  <Link to="/company/applicants" className="btn btn-outline text-sm h-8">
-                    View Applicants
-                  </Link>
                 </div>
-              </div>
-
-              {/* Job Item 3 */}
-              <div className="p-6 hover:bg-accent transition-colors">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <h3 className="font-semibold mb-1">
-                      <Link to="#" className="hover:text-primary">
-                        DevOps Engineer
-                      </Link>
-                    </h3>
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-4 w-4" />
-                        Austin, TX
-                      </span>
-                      <span>•</span>
-                      <span>Full-time</span>
-                      <span>•</span>
-                      <span>Posted 1 week ago</span>
-                    </div>
-                  </div>
-                  <span className="badge badge-warning">Expiring Soon</span>
-                </div>
-                <div className="flex items-center justify-between mt-4">
-                  <div className="flex -space-x-2">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-8 w-8 rounded-full bg-secondary border-2 border-background flex items-center justify-center text-xs font-medium">
-                        {String.fromCharCode(70 + i)}
-                      </div>
-                    ))}
-                    <div className="h-8 w-8 rounded-full bg-secondary border-2 border-background flex items-center justify-center text-xs font-medium">
-                      +15
-                    </div>
-                  </div>
-                  <Link to="/company/applicants" className="btn btn-outline text-sm h-8">
-                    View Applicants
-                  </Link>
-                </div>
-              </div>
-            </div>
+              ))
+            )}
           </div>
         </div>
 
-        {/* Sidebar Column */}
-        <div className="lg:col-span-1 space-y-6">
-          {/* Quick Actions */}
-          <div className="card p-6">
-            <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-            <div className="space-y-3">
-              <Link to="/company/create-job" className="btn btn-primary w-full justify-start">
-                <Briefcase className="h-4 w-4 mr-2" />
-                Post a New Job
-              </Link>
-              <Link to="/company/applicants" className="btn btn-outline w-full justify-start">
-                <Users className="h-4 w-4 mr-2" />
-                Browse Candidates
-              </Link>
-            </div>
+        {/* Recent Applicants */}
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold">Recent Applicants</h2>
+            <Link to="/company/applicants" className="text-sm text-primary hover:underline flex items-center">
+              View All <ChevronRight className="h-4 w-4 ml-1" />
+            </Link>
           </div>
-
-          {/* Recent Activity */}
-          <div className="card p-6">
-            <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
-            <div className="space-y-4">
-              <div className="flex gap-3">
-                <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                  <Users className="h-4 w-4 text-blue-600" />
+          <div className="space-y-4">
+            {recentApplicants.length === 0 ? (
+              <p className="text-muted-foreground text-center py-4">No applicants yet.</p>
+            ) : (
+              recentApplicants.map(app => (
+                <div key={app.id} className="flex items-center gap-4 p-4 border border-border rounded-lg hover:bg-accent/50 transition-colors">
+                  <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+                    {app.user.profilePictureUrl ? (
+                      <img src={app.user.profilePictureUrl} alt={app.user.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="font-bold text-primary">{app.user.name.charAt(0)}</span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium truncate">{app.user.name}</h3>
+                    <p className="text-sm text-muted-foreground truncate">
+                      Applied for <span className="text-foreground">{app.job.title}</span>
+                    </p>
+                  </div>
+                  <span className={`badge ${
+                    app.status === 'New' ? 'badge-warning' :
+                    app.status === 'Shortlisted' ? 'badge-info' :
+                    app.status === 'Interviewed' ? 'badge-primary' :
+                    app.status === 'Hired' ? 'badge-success' :
+                    'badge-secondary'
+                  }`}>
+                    {app.status}
+                  </span>
                 </div>
-                <div>
-                  <p className="text-sm">
-                    <span className="font-medium">John Doe</span> applied for{' '}
-                    <span className="font-medium">Senior Full Stack Developer</span>
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">2 hours ago</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                  <Briefcase className="h-4 w-4 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-sm">
-                    New job posted:{' '}
-                    <span className="font-medium">Product Manager</span>
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">5 hours ago</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
-                  <Star className="h-4 w-4 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-sm">
-                    You shortlisted <span className="font-medium">Sarah Smith</span>
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">1 day ago</p>
-                </div>
-              </div>
-            </div>
-            <button className="btn btn-ghost w-full mt-4 text-sm">
-              View All Activity
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </button>
+              ))
+            )}
           </div>
         </div>
       </div>
@@ -265,4 +204,3 @@ const CompanyDashboard = () => {
 };
 
 export default CompanyDashboard;
-

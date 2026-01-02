@@ -63,12 +63,15 @@ const getJobs = async (req, res) => {
         if (search) {
             const searchTerm = `%${search.toLowerCase()}%`;
             where[Op.or] = [
-                { title: { [Op.like]: searchTerm } },
+                // Use Sequelize.where and Sequelize.fn for case-insensitive search in SQLite
+                Sequelize.where(Sequelize.fn('lower', Sequelize.col('title')), 'LIKE', searchTerm),
                 // Cast JSON skills to TEXT for LIKE search
                 Sequelize.where(
                     Sequelize.cast(Sequelize.col('Job.skills'), 'TEXT'),
                     { [Op.like]: searchTerm }
-                )
+                ),
+                // Also search by company name
+                { '$Company.name$': { [Op.like]: searchTerm } }
             ];
         }
 
@@ -204,7 +207,8 @@ const getJobs = async (req, res) => {
 // @access  Public
 const getJobBySlug = async (req, res) => {
     try {
-        const job = await Job.findOne({
+        // Try to find by slug first
+        let job = await Job.findOne({
             where: { slug: req.params.slug },
             include: [
                 {
@@ -219,6 +223,29 @@ const getJobBySlug = async (req, res) => {
                 }
             ]
         });
+
+        // If not found by slug, try to find by ID (UUID)
+        if (!job) {
+            // Check if the param is a valid UUID
+            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.params.slug);
+
+            if (isUUID) {
+                job = await Job.findByPk(req.params.slug, {
+                    include: [
+                        {
+                            model: Company,
+                            as: 'company',
+                            attributes: { exclude: ['password'] }
+                        },
+                        {
+                            model: Application,
+                            as: 'applications',
+                            attributes: ['id']
+                        }
+                    ]
+                });
+            }
+        }
 
         if (!job) {
             return res.status(404).json({ success: false, message: 'Job not found' });
@@ -296,9 +323,6 @@ const getRecommendedJobs = async (req, res) => {
         if ((!skills || skills.length === 0) && !experienceLevel) {
             return res.status(200).json({ success: true, data: [] });
         }
-
-        let where = { status: 'Active' };
-        let conditions = [];
 
         // Match skills (Overlap)
         // Since skills are JSON/Array, exact match is tricky in SQLite without extensive query.

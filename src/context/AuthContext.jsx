@@ -64,9 +64,10 @@ export const AuthProvider = ({ children }) => {
         }
         return { success: true };
       } else {
-        return { success: false, message: data.message };
+        return { success: false, message: data.message || 'Login failed' };
       }
     } catch (error) {
+      console.error('Login error:', error);
       return { success: false, message: 'Login failed. Please try again.' };
     }
   };
@@ -95,9 +96,10 @@ export const AuthProvider = ({ children }) => {
         }
         return { success: true };
       } else {
-        return { success: false, message: data.message };
+        return { success: false, message: data.message || 'Registration failed' };
       }
     } catch (error) {
+      console.error('Registration error:', error);
       return { success: false, message: 'Registration failed. Please try again.' };
     }
   };
@@ -117,4 +119,3 @@ export const AuthProvider = ({ children }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
-

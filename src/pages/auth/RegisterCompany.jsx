@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, User, Mail, Globe, Briefcase, Users, Calendar, MapPin, Shield, Lock, Eye, EyeOff } from 'lucide-react';
+import { Building2, User, Mail, Globe, Briefcase, Users, Calendar, MapPin, Shield, Lock, Eye, EyeOff, Zap, ChartLine } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 const RegisterCompany = () => {
@@ -37,7 +37,11 @@ const RegisterCompany = () => {
       return;
     }
 
+    console.log('RegisterCompany: Submitting form data:', formData);
+
     const result = await register(formData, 'COMPANY');
+    console.log('RegisterCompany: Registration result:', result);
+
     if (!result.success) {
       setError(result.message);
     }
@@ -75,14 +79,13 @@ const RegisterCompany = () => {
           </div>
         </div>
 
-        {/* Registration Card */}
+        {/* Register Card */}
         <div className="card p-8 md:p-10">
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-              <span className="block sm:inline">{error}</span>
+            <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md mb-4">
+              {error}
             </div>
           )}
-          {/* Registration Form */}
           <form className="space-y-6" onSubmit={handleSubmit}>
             {/* Company Information Section */}
             <div className="space-y-5">
@@ -93,7 +96,7 @@ const RegisterCompany = () => {
 
               {/* Company Name */}
               <div className="space-y-2">
-                <label htmlFor="name" className="label">
+                <label htmlFor="name" className="text-sm font-medium leading-none">
                   Company Name <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
@@ -102,7 +105,7 @@ const RegisterCompany = () => {
                     type="text"
                     id="name"
                     name="name"
-                    className="input pl-10"
+                    className="input pl-10 w-full"
                     placeholder="e.g., TechCorp Solutions"
                     value={formData.name}
                     onChange={handleChange}
@@ -111,8 +114,9 @@ const RegisterCompany = () => {
                 </div>
               </div>
 
+              {/* Email */}
               <div className="space-y-2">
-                <label htmlFor="email" className="label">
+                <label htmlFor="email" className="text-sm font-medium leading-none">
                   Email Address <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
@@ -121,7 +125,7 @@ const RegisterCompany = () => {
                     type="email"
                     id="email"
                     name="email"
-                    className="input pl-10"
+                    className="input pl-10 w-full"
                     placeholder="john.doe@company.com"
                     value={formData.email}
                     onChange={handleChange}
@@ -133,7 +137,7 @@ const RegisterCompany = () => {
               {/* Company Website & Industry Row */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <label htmlFor="website" className="label">
+                  <label htmlFor="website" className="text-sm font-medium leading-none">
                     Company Website <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
@@ -142,7 +146,7 @@ const RegisterCompany = () => {
                       type="url"
                       id="website"
                       name="website"
-                      className="input pl-10"
+                      className="input pl-10 w-full"
                       placeholder="https://example.com"
                       value={formData.website}
                       onChange={handleChange}
@@ -151,7 +155,7 @@ const RegisterCompany = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label htmlFor="industry" className="label">
+                  <label htmlFor="industry" className="text-sm font-medium leading-none">
                     Industry <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
@@ -159,7 +163,7 @@ const RegisterCompany = () => {
                     <select
                       id="industry"
                       name="industry"
-                      className="input pl-10"
+                      className="input pl-10 w-full"
                       value={formData.industry}
                       onChange={handleChange}
                       required
@@ -182,7 +186,7 @@ const RegisterCompany = () => {
               {/* Company Size & Founded Year Row */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <label htmlFor="companySize" className="label">
+                  <label htmlFor="companySize" className="text-sm font-medium leading-none">
                     Company Size
                   </label>
                   <div className="relative">
@@ -190,7 +194,7 @@ const RegisterCompany = () => {
                     <select
                       id="companySize"
                       name="companySize"
-                      className="input pl-10"
+                      className="input pl-10 w-full"
                       value={formData.companySize}
                       onChange={handleChange}
                     >
@@ -205,7 +209,7 @@ const RegisterCompany = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label htmlFor="foundedYear" className="label">
+                  <label htmlFor="foundedYear" className="text-sm font-medium leading-none">
                     Founded Year
                   </label>
                   <div className="relative">
@@ -214,7 +218,7 @@ const RegisterCompany = () => {
                       type="number"
                       id="foundedYear"
                       name="foundedYear"
-                      className="input pl-10"
+                      className="input pl-10 w-full"
                       placeholder="e.g., 2010"
                       min="1800"
                       max="2025"
@@ -227,7 +231,7 @@ const RegisterCompany = () => {
 
               {/* Company Location */}
               <div className="space-y-2">
-                <label htmlFor="location" className="label">
+                <label htmlFor="location" className="text-sm font-medium leading-none">
                   Headquarters Location <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
@@ -236,7 +240,7 @@ const RegisterCompany = () => {
                     type="text"
                     id="location"
                     name="location"
-                    className="input pl-10"
+                    className="input pl-10 w-full"
                     placeholder="City, Country"
                     value={formData.location}
                     onChange={handleChange}
@@ -247,13 +251,13 @@ const RegisterCompany = () => {
 
               {/* Company Description */}
               <div className="space-y-2">
-                <label htmlFor="description" className="label">
+                <label htmlFor="description" className="text-sm font-medium leading-none">
                   Company Description <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   id="description"
                   name="description"
-                  className="textarea min-h-[120px]"
+                  className="textarea min-h-[120px] w-full"
                   placeholder="Tell us about your company, mission, and what makes it a great place to work..."
                   value={formData.description}
                   onChange={handleChange}
@@ -275,7 +279,7 @@ const RegisterCompany = () => {
               {/* Password Fields Row */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <label htmlFor="password" className="label">
+                  <label htmlFor="password" className="text-sm font-medium leading-none">
                     Password <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
@@ -284,7 +288,7 @@ const RegisterCompany = () => {
                       type={showPassword ? 'text' : 'password'}
                       id="password"
                       name="password"
-                      className="input pl-10 pr-10"
+                      className="input pl-10 pr-10 w-full"
                       placeholder="Create a strong password"
                       value={formData.password}
                       onChange={handleChange}
@@ -292,15 +296,19 @@ const RegisterCompany = () => {
                     />
                     <button
                       type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                       onClick={togglePassword}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
                     </button>
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label htmlFor="confirmPassword" className="label">
+                  <label htmlFor="confirmPassword" className="text-sm font-medium leading-none">
                     Confirm Password <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
@@ -309,7 +317,7 @@ const RegisterCompany = () => {
                       type={showConfirmPassword ? 'text' : 'password'}
                       id="confirmPassword"
                       name="confirmPassword"
-                      className="input pl-10 pr-10"
+                      className="input pl-10 pr-10 w-full"
                       placeholder="Re-enter your password"
                       value={formData.confirmPassword}
                       onChange={handleChange}
@@ -317,49 +325,130 @@ const RegisterCompany = () => {
                     />
                     <button
                       type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                       onClick={toggleConfirmPassword}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
-                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
                     </button>
                   </div>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground -mt-2">
-                Password must be at least 8 characters with numbers and symbols
+                Password must be at least 8 characters with letters and numbers
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="terms"
-                name="terms"
-                className="rounded border-input"
-                required
-              />
-              <label htmlFor="terms" className="text-sm text-muted-foreground">
-                I agree to the{' '}
-                <a href="#" className="text-primary hover:underline">
-                  Terms of Service
-                </a>{' '}
-                and{' '}
-                <a href="#" className="text-primary hover:underline">
-                  Privacy Policy
-                </a>
-              </label>
+            {/* Terms and Conditions */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  id="terms"
+                  className="mt-1 h-4 w-4 rounded border-input text-primary focus:ring-ring"
+                  required
+                />
+                <label htmlFor="terms" className="text-sm text-muted-foreground">
+                  I agree to the{' '}
+                  <a href="#" className="text-primary hover:underline">
+                    Terms of Service
+                  </a>{' '}
+                  and{' '}
+                  <a href="#" className="text-primary hover:underline">
+                    Privacy Policy
+                  </a>
+                </label>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  id="verified"
+                  className="mt-1 h-4 w-4 rounded border-input text-primary focus:ring-ring"
+                  required
+                />
+                <label htmlFor="verified" className="text-sm text-muted-foreground">
+                  I confirm that I am an authorized representative of this company and have the right to register on its behalf
+                </label>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  id="updates"
+                  className="mt-1 h-4 w-4 rounded border-input text-primary focus:ring-ring"
+                />
+                <label htmlFor="updates" className="text-sm text-muted-foreground">
+                  Send me product updates, hiring tips, and promotional offers via email
+                </label>
+              </div>
             </div>
 
-            <button type="submit" className="btn btn-primary w-full">
-              Create Company Account
+            {/* Submit Button */}
+            <button type="submit" className="btn btn-primary w-full text-base h-11 mt-2">
+              <Building2 className="h-4 w-4 mr-2" />
+              Register Company
             </button>
           </form>
 
-          <div className="mt-6 text-center text-sm">
-            <span className="text-muted-foreground">Already have an account? </span>
+          {/* Divider */}
+          <div className="relative my-8">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="bg-card px-4 text-muted-foreground font-medium">
+                Or continue with
+              </span>
+            </div>
+          </div>
+
+          {/* Sign In Link */}
+          <div className="mt-8 text-center text-sm text-muted-foreground">
+            Already have an account?{' '}
             <Link to="/login" className="text-primary hover:underline font-medium">
               Sign in
             </Link>
+          </div>
+        </div>
+
+        {/* Benefits for Employers */}
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <Users className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm mb-1">Access Top Talent</h3>
+              <p className="text-xs text-muted-foreground">
+                Connect with thousands of qualified candidates actively looking for opportunities
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <Zap className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm mb-1">Easy Job Posting</h3>
+              <p className="text-xs text-muted-foreground">
+                Post jobs in minutes with our intuitive interface and smart templates
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <ChartLine className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm mb-1">Smart Analytics</h3>
+              <p className="text-xs text-muted-foreground">
+                Track applications and optimize your hiring with detailed insights
+              </p>
+            </div>
           </div>
         </div>
       </div>

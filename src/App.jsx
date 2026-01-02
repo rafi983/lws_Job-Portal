@@ -31,17 +31,24 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/register-company" element={<RegisterCompany />} />
+
+              {/* Company Routes */}
               <Route path="/company/dashboard" element={<CompanyDashboard />} />
               <Route path="/company/create-job" element={<CreateJob />} />
               <Route path="/company/applicants" element={<Applicants />} />
               <Route path="/company/manage-jobs" element={<ManageJobs />} />
               <Route path="/company/profile" element={<CompanyProfile />} />
               <Route path="/company/settings" element={<CompanySettings />} />
+              <Route path="/companies/:slug" element={<CompanyProfile />} /> {/* Public view of company profile */}
+
+              {/* Job Seeker Routes */}
               <Route path="/job-seeker/dashboard" element={<UserDashboard />} />
               <Route path="/job-seeker/applications" element={<AppliedJobs />} />
-              <Route path="/jobs/:id" element={<JobDetails />} />
               <Route path="/job-seeker/profile" element={<UserProfile />} />
               <Route path="/job-seeker/edit-profile" element={<EditUserProfile />} />
+
+              {/* Public Job Routes */}
+              <Route path="/jobs/:id" element={<JobDetails />} />
             </Routes>
           </div>
           <Footer />

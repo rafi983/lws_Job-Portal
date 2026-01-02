@@ -1,10 +1,16 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { User, Company } = require('../models');
+require('dotenv').config(); // Ensure env vars are loaded
 
 // Generate JWT
 const generateToken = (id, role) => {
-    return jwt.sign({ id, role }, process.env.JWT_SECRET, {
+    const secret = process.env.JWT_SECRET || 'dev_secret_key_123';
+    if (!secret) {
+        console.error('JWT_SECRET is missing!');
+        throw new Error('JWT_SECRET is missing');
+    }
+    return jwt.sign({ id, role }, secret, {
         expiresIn: '30d',
     });
 };
@@ -37,12 +43,16 @@ const register = async (req, res) => {
         let token;
 
         if (role === 'USER') {
+            // Filter out fields that might not exist in the User model or cause issues
+            // eslint-disable-next-line no-unused-vars
+            const { confirmPassword, ...userData } = otherData;
+
             const user = await User.create({
                 name,
                 email,
                 password: hashedPassword,
                 role: 'USER',
-                ...otherData
+                ...userData
             });
             data = {
                 id: user.id,
@@ -52,6 +62,36 @@ const register = async (req, res) => {
             };
             token = generateToken(user.id, 'USER');
         } else if (role === 'COMPANY') {
+            // Filter out fields that might not exist in the Company model or cause issues
+            // eslint-disable-next-line no-unused-vars
+            const { confirmPassword, website, companySize, foundedYear, ...companyData } = otherData;
+
+            // Map frontend fields to backend model fields if necessary
+            // website -> websiteUrl
+            // companySize -> employeeCount
+
+            const mappedData = {
+                ...companyData,
+                websiteUrl: website,
+                employeeCount: companySize
+            };
+
+            // Handle foundedYear: convert to integer or set to null if empty
+            if (foundedYear) {
+                mappedData.foundedYear = parseInt(foundedYear, 10);
+            } else {
+                // Explicitly remove foundedYear if it's empty string to avoid validation errors if any
+                delete mappedData.foundedYear;
+            }
+
+            // Ensure empty strings for optional fields are treated as null or allowed if model allows
+            // For SQLite/Sequelize, empty string might be fine for STRING types, but let's be safe
+            if (mappedData.websiteUrl === '') mappedData.websiteUrl = null;
+            if (mappedData.employeeCount === '') mappedData.employeeCount = null;
+            if (mappedData.industry === '') mappedData.industry = null;
+            if (mappedData.location === '') mappedData.location = null;
+            if (mappedData.description === '') mappedData.description = null;
+
             // Generate slug
             let slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
             let slugExists = await Company.findOne({ where: { slug } });
@@ -72,7 +112,7 @@ const register = async (req, res) => {
                 email,
                 password: hashedPassword,
                 role: 'COMPANY',
-                ...otherData
+                ...mappedData
             });
             data = {
                 id: company.id,
@@ -93,8 +133,8 @@ const register = async (req, res) => {
         });
 
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+        console.error('Registration Error:', error);
+        res.status(500).json({ success: false, message: error.message || 'Server Error', stack: error.stack });
     }
 };
 

@@ -1,8 +1,102 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, RotateCcw, ChevronDown, Building2, MapPin, Briefcase, DollarSign, Clock, Eye, X, Code2, Smartphone, Database, Palette, Loader2 } from 'lucide-react';
+import { ChevronRight, RotateCcw, ChevronDown, Building2, MapPin, Briefcase, DollarSign, Clock, Eye, Loader2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const AppliedJobs = () => {
+  const [applications, setApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({
+    status: [],
+    date: 'all'
+  });
+  const [sort, setSort] = useState('Newest First');
+  const [stats, setStats] = useState({
+    total: 0,
+    underReview: 0,
+    shortlisted: 0,
+    rejected: 0
+  });
+
+  const fetchApplications = useCallback(async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const queryParams = new URLSearchParams();
+
+      if (filters.status.length > 0) {
+        queryParams.append('status', filters.status.join(','));
+      }
+
+      if (filters.date !== 'all') {
+        queryParams.append('date', filters.date);
+      }
+
+      queryParams.append('sort', sort);
+
+      const response = await fetch(`http://localhost:5000/api/applications/my-applications?${queryParams.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setApplications(data.data);
+
+        // Simple stats calculation based on fetched data (approximate if filtered)
+        // Ideally, we should have a separate endpoint for stats or get it in metadata
+        const total = data.data.length;
+        const underReview = data.data.filter(app => app.status === 'New' || app.status === 'Interviewed').length;
+        const shortlisted = data.data.filter(app => app.status === 'Shortlisted').length;
+        const rejected = data.data.filter(app => app.status === 'Rejected').length;
+
+        setStats({
+          total,
+          underReview,
+          shortlisted,
+          rejected
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [filters, sort]);
+
+  useEffect(() => {
+    fetchApplications();
+  }, [fetchApplications]);
+
+  const handleStatusChange = (status) => {
+    setFilters(prev => {
+      const newStatus = prev.status.includes(status)
+        ? prev.status.filter(s => s !== status)
+        : [...prev.status, status];
+      return { ...prev, status: newStatus };
+    });
+  };
+
+  const handleDateChange = (date) => {
+    setFilters(prev => ({ ...prev, date }));
+  };
+
+  const handleSortChange = (newSort) => {
+    setSort(newSort);
+  };
+
+  const getStatusBadgeClass = (status) => {
+    switch (status) {
+      case 'New': return 'badge badge-warning';
+      case 'Shortlisted': return 'badge badge-info';
+      case 'Interviewed': return 'badge badge-primary';
+      case 'Rejected': return 'badge badge-danger';
+      case 'Hired': return 'badge badge-success';
+      default: return 'badge badge-secondary';
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Page Header */}
@@ -12,419 +106,196 @@ const AppliedJobs = () => {
             Dashboard
           </Link>
           <ChevronRight className="h-4 w-4" />
-          <span className="text-foreground">Applied Jobs</span>
+          <span className="text-foreground">My Applications</span>
         </div>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Applied Jobs</h1>
+            <h1 className="text-3xl font-bold mb-2">My Applications</h1>
             <p className="text-muted-foreground">
-              Track all your job applications in one place
+              Track and manage your job applications
             </p>
           </div>
-          <div className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">12</span> applications
+          <div className="flex gap-4">
+            <div className="text-center px-4 py-2 bg-secondary rounded-lg">
+              <p className="text-2xl font-bold text-primary">{stats.total}</p>
+              <p className="text-xs text-muted-foreground">Total Applied</p>
+            </div>
+            <div className="text-center px-4 py-2 bg-secondary rounded-lg">
+              <p className="text-2xl font-bold text-yellow-600">{stats.underReview}</p>
+              <p className="text-xs text-muted-foreground">Under Review</p>
+            </div>
+            <div className="text-center px-4 py-2 bg-secondary rounded-lg">
+              <p className="text-2xl font-bold text-blue-600">{stats.shortlisted}</p>
+              <p className="text-xs text-muted-foreground">Shortlisted</p>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Filters Sidebar */}
         <aside className="lg:col-span-1">
           <div className="card p-6 sticky top-20">
-            <h2 className="font-semibold mb-4">Filters</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">Filters</h3>
+              <button
+                className="text-sm text-primary hover:underline flex items-center"
+                onClick={() => setFilters({ status: [], date: 'all' })}
+              >
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Reset
+              </button>
+            </div>
 
             {/* Status Filter */}
             <div className="mb-6">
-              <h3 className="text-sm font-medium mb-3">Application Status</h3>
+              <h4 className="text-sm font-medium mb-3">Application Status</h4>
               <div className="space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" className="rounded border-input" defaultChecked />
-                  <span className="text-sm">All</span>
-                  <span className="ml-auto text-xs text-muted-foreground">12</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" className="rounded border-input" />
-                  <span className="text-sm">Under Review</span>
-                  <span className="ml-auto text-xs text-muted-foreground">5</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" className="rounded border-input" />
-                  <span className="text-sm">Shortlisted</span>
-                  <span className="ml-auto text-xs text-muted-foreground">3</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" className="rounded border-input" />
-                  <span className="text-sm">Rejected</span>
-                  <span className="ml-auto text-xs text-muted-foreground">2</span>
-                </label>
+                {['New', 'Shortlisted', 'Interviewed', 'Rejected', 'Hired'].map(status => (
+                  <label key={status} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="rounded border-input"
+                      checked={filters.status.includes(status)}
+                      onChange={() => handleStatusChange(status)}
+                    />
+                    <span className="text-sm">{status}</span>
+                  </label>
+                ))}
               </div>
             </div>
 
             {/* Date Filter */}
-            <div className="mb-6">
-              <h3 className="text-sm font-medium mb-3">Application Date</h3>
+            <div>
+              <h4 className="text-sm font-medium mb-3">Applied Date</h4>
               <div className="space-y-2">
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="date" className="border-input" defaultChecked />
+                  <input
+                    type="radio"
+                    name="date"
+                    className="border-input"
+                    checked={filters.date === 'all'}
+                    onChange={() => handleDateChange('all')}
+                  />
                   <span className="text-sm">All Time</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="date" className="border-input" />
+                  <input
+                    type="radio"
+                    name="date"
+                    className="border-input"
+                    checked={filters.date === 'last 7 days'}
+                    onChange={() => handleDateChange('last 7 days')}
+                  />
                   <span className="text-sm">Last 7 Days</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="date" className="border-input" />
+                  <input
+                    type="radio"
+                    name="date"
+                    className="border-input"
+                    checked={filters.date === 'last 30 days'}
+                    onChange={() => handleDateChange('last 30 days')}
+                  />
                   <span className="text-sm">Last 30 Days</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="date" className="border-input" />
-                  <span className="text-sm">Last 3 Months</span>
                 </label>
               </div>
             </div>
-
-            <button className="btn btn-outline w-full">
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Reset Filters
-            </button>
           </div>
         </aside>
 
         {/* Applications List */}
         <div className="lg:col-span-3 space-y-4">
-          {/* Sort and View Options */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Sort by:</span>
-              <div className="relative group">
-                <button className="btn btn-outline text-sm h-9 flex items-center">
-                  <span>Newest First</span>
-                  <ChevronDown className="h-4 w-4 ml-2" />
-                </button>
-                <div className="hidden group-hover:block absolute top-full left-0 mt-2 w-48 card p-2 shadow-lg z-10">
-                  <button className="w-full text-left px-3 py-2 text-sm rounded hover:bg-accent">
-                    Newest First
-                  </button>
-                  <button className="w-full text-left px-3 py-2 text-sm rounded hover:bg-accent">
-                    Oldest First
-                  </button>
-                </div>
+          {/* Sort Bar */}
+          <div className="flex justify-end mb-4">
+            <div className="relative group">
+              <button className="btn btn-outline flex items-center text-sm">
+                Sort by: {sort}
+                <ChevronDown className="h-4 w-4 ml-2" />
+              </button>
+              <div className="hidden group-hover:block absolute top-full right-0 mt-1 w-40 card p-1 shadow-lg z-10">
+                <button className="w-full text-left px-3 py-2 text-sm rounded hover:bg-accent" onClick={() => handleSortChange('Newest First')}>Newest First</button>
+                <button className="w-full text-left px-3 py-2 text-sm rounded hover:bg-accent" onClick={() => handleSortChange('Oldest First')}>Oldest First</button>
               </div>
             </div>
           </div>
 
-          {/* Application Card 1 - Interview Scheduled */}
-          <div className="card p-6 hover:shadow-md transition-shadow">
-            <div className="flex flex-col md:flex-row gap-6">
-              {/* Company Logo */}
-              <div className="flex-shrink-0">
-                <div className="h-16 w-16 rounded-lg bg-secondary flex items-center justify-center">
-                  <Building2 className="h-8 w-8 text-primary" />
-                </div>
-              </div>
-
-              {/* Job Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold mb-1">
-                      <Link to="#" className="hover:text-primary">
-                        Senior Full Stack Developer
-                      </Link>
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      <Link to="#" className="hover:text-primary">
-                        TechCorp Solutions
-                      </Link>
-                    </p>
-                  </div>
-                  <span className="badge badge-warning">Under Review</span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-4 w-4" />
-                    San Francisco, CA
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Briefcase className="h-4 w-4" />
-                    Full-time
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <DollarSign className="h-4 w-4" />
-                    $120k - $160k
-                  </span>
-                </div>
-
-                {/* Application Info */}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      Applied on Nov 25, 2025
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Link to="#" className="btn btn-outline text-sm h-9">
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Job
-                    </Link>
-                  </div>
-                </div>
-              </div>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-          </div>
-
-          {/* Application Card 2 - Under Review */}
-          <div className="card p-6 hover:shadow-md transition-shadow">
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="flex-shrink-0">
-                <div className="h-16 w-16 rounded-lg bg-secondary flex items-center justify-center">
-                  <Code2 className="h-8 w-8 text-primary" />
-                </div>
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold mb-1">
-                      <Link to="#" className="hover:text-primary">
-                        Frontend Developer
-                      </Link>
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      <Link to="#" className="hover:text-primary">
-                        Digital Innovations Inc
-                      </Link>
-                    </p>
-                  </div>
-                  <span className="badge badge-warning">Under Review</span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-4 w-4" />
-                    Remote
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Briefcase className="h-4 w-4" />
-                    Full-time
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <DollarSign className="h-4 w-4" />
-                    $90k - $130k
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      Applied on Nov 28, 2025
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Link to="#" className="btn btn-outline text-sm h-9">
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Job
-                    </Link>
-                    <button className="btn btn-outline text-sm h-9">
-                      <X className="h-4 w-4 mr-2" />
-                      Withdraw
-                    </button>
-                  </div>
-                </div>
-              </div>
+          ) : applications.length === 0 ? (
+            <div className="text-center py-12 card">
+              <p className="text-muted-foreground">No applications found matching your filters.</p>
             </div>
-          </div>
+          ) : (
+            applications.map((app) => (
+              <div key={app.id} className="card p-6 hover:shadow-md transition-shadow">
+                <div className="flex flex-col md:flex-row gap-6">
+                  {/* Company Logo */}
+                  <div className="flex-shrink-0">
+                    <div className="h-16 w-16 rounded-lg bg-secondary flex items-center justify-center overflow-hidden">
+                      {app.job.company.logoUrl ? (
+                        <img src={app.job.company.logoUrl} alt={app.job.company.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <Building2 className="h-8 w-8 text-primary" />
+                      )}
+                    </div>
+                  </div>
 
-          {/* Application Card 3 - Shortlisted */}
-          <div className="card p-6 hover:shadow-md transition-shadow">
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="flex-shrink-0">
-                <div className="h-16 w-16 rounded-lg bg-secondary flex items-center justify-center">
-                  <Smartphone className="h-8 w-8 text-primary" />
-                </div>
-              </div>
+                  {/* Application Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
+                      <div>
+                        <h3 className="text-xl font-semibold mb-1">
+                          <Link to={`/jobs/${app.job.id}`} className="hover:text-primary">
+                            {app.job.title}
+                          </Link>
+                        </h3>
+                        <Link to={`/companies/${app.job.company.slug}`} className="text-sm text-muted-foreground hover:text-primary">
+                          {app.job.company.name}
+                        </Link>
+                      </div>
+                      <span className={getStatusBadgeClass(app.status)}>
+                        {app.status}
+                      </span>
+                    </div>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold mb-1">
-                      <Link to="#" className="hover:text-primary">
-                        Mobile App Developer
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
+                      <span className="flex items-center gap-1">
+                        <MapPin className="h-4 w-4" />
+                        {app.job.location}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Briefcase className="h-4 w-4" />
+                        {app.job.type}
+                      </span>
+                      {(app.job.salaryMin || app.job.salaryMax) && (
+                        <span className="flex items-center gap-1">
+                          <DollarSign className="h-4 w-4" />
+                          {app.job.salaryMin && app.job.salaryMax
+                            ? `$${app.job.salaryMin} - $${app.job.salaryMax}`
+                            : `$${app.job.salaryMin || app.job.salaryMax}`}
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        Applied {new Date(app.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-4 border-t border-border">
+                      <Link to={`/jobs/${app.job.id}`} className="btn btn-outline btn-sm">
+                        <Eye className="h-4 w-4 mr-2" />
+                        View Job
                       </Link>
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      <Link to="#" className="hover:text-primary">
-                        AppWorks Studio
-                      </Link>
-                    </p>
-                  </div>
-                  <span className="badge badge-info">Shortlisted</span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-4 w-4" />
-                    New York, NY
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Briefcase className="h-4 w-4" />
-                    Full-time
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <DollarSign className="h-4 w-4" />
-                    $100k - $140k
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      Applied on Nov 20, 2025
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Link to="#" className="btn btn-outline text-sm h-9">
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Job
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Application Card 4 - Under Review */}
-          <div className="card p-6 hover:shadow-md transition-shadow">
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="flex-shrink-0">
-                <div className="h-16 w-16 rounded-lg bg-secondary flex items-center justify-center">
-                  <Database className="h-8 w-8 text-primary" />
-                </div>
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold mb-1">
-                      <Link to="#" className="hover:text-primary">
-                        Backend Engineer
-                      </Link>
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      <Link to="#" className="hover:text-primary">
-                        DataFlow Systems
-                      </Link>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-4 w-4" />
-                    Austin, TX
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Briefcase className="h-4 w-4" />
-                    Full-time
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <DollarSign className="h-4 w-4" />
-                    $110k - $150k
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      Applied on Nov 15, 2025
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Link to="#" className="btn btn-outline text-sm h-9">
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Job
-                    </Link>
-                    <button className="btn btn-outline text-sm h-9">
-                      <X className="h-4 w-4 mr-2" />
-                      Withdraw
-                    </button>
+                      {/* Withdraw button could be here too, but it's on job details page */}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Application Card 5 - Rejected */}
-          <div className="card p-6 hover:shadow-md transition-shadow opacity-75">
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="flex-shrink-0">
-                <div className="h-16 w-16 rounded-lg bg-secondary flex items-center justify-center">
-                  <Palette className="h-8 w-8 text-primary" />
-                </div>
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold mb-1">
-                      <Link to="#" className="hover:text-primary">
-                        UI/UX Designer
-                      </Link>
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      <Link to="#" className="hover:text-primary">
-                        Creative Labs
-                      </Link>
-                    </p>
-                  </div>
-                  <span className="badge badge-danger">Not Selected</span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-4 w-4" />
-                    Los Angeles, CA
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Briefcase className="h-4 w-4" />
-                    Full-time
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <DollarSign className="h-4 w-4" />
-                    $80k - $120k
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      Applied on Nov 10, 2025
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Link to="#" className="btn btn-outline text-sm h-9">
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Job
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Load More */}
-          <div className="flex justify-center pt-6">
-            <button className="btn btn-outline">
-              <Loader2 className="h-4 w-4 mr-2" />
-              Load More Applications
-            </button>
-          </div>
+            ))
+          )}
         </div>
       </div>
     </div>
@@ -432,4 +303,3 @@ const AppliedJobs = () => {
 };
 
 export default AppliedJobs;
-

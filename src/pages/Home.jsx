@@ -1,32 +1,166 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Search, ChevronDown, Building2, MapPin, Clock, Users, Monitor, Cpu, Code, X, Upload, FileText, Trash2, Send } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Search, ChevronDown, Building2, MapPin, Clock, X, Upload, FileText, Trash2, Send, Loader2, Briefcase, DollarSign } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const Home = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({
+    search: '',
+    type: '',
+    location: '',
+    category: ''
+  });
+  const [sort, setSort] = useState('newest');
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    totalPages: 1
+  });
+  const [activeDropdown, setActiveDropdown] = useState(null);
+
+  // Apply Dialog State
   const [isApplyDialogOpen, setIsApplyDialogOpen] = useState(false);
+  const [selectedJob, setSelectedJob] = useState(null);
   const [resumeFile, setResumeFile] = useState(null);
   const [coverMessage, setCoverMessage] = useState('');
-  const [activeDropdown, setActiveDropdown] = useState(null);
+  const [applying, setApplying] = useState(false);
+
+  const fetchJobs = useCallback(async () => {
+    setLoading(true);
+    try {
+      const queryParams = new URLSearchParams();
+      if (filters.search) queryParams.append('search', filters.search);
+      if (filters.type) queryParams.append('type', filters.type);
+      if (filters.location) queryParams.append('location', filters.location);
+      if (filters.category) queryParams.append('category', filters.category);
+      queryParams.append('sort', sort);
+      queryParams.append('page', pagination.page);
+      queryParams.append('limit', pagination.limit);
+
+      console.log('Fetching jobs with params:', queryParams.toString());
+      const response = await fetch(`http://localhost:5000/api/jobs?${queryParams.toString()}`);
+      const data = await response.json();
+      console.log('Jobs API response:', data);
+
+      if (data.success) {
+        // Ensure data.data is an array before setting it
+        setJobs(Array.isArray(data.data) ? data.data : []);
+        setPagination(prev => ({
+          ...prev,
+          totalPages: data.totalPages || 1
+        }));
+      } else {
+        // Handle case where success is false but maybe no error thrown
+        setJobs([]);
+      }
+    } catch (error) {
+      console.error('Error fetching jobs:', error);
+      setJobs([]); // Clear jobs on error
+    } finally {
+      setLoading(false);
+    }
+  }, [filters, sort, pagination.page, pagination.limit]);
+
+  useEffect(() => {
+    fetchJobs();
+  }, [fetchJobs]);
+
+  const handleSearchChange = (e) => {
+    setFilters(prev => ({ ...prev, search: e.target.value }));
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+    setPagination(prev => ({ ...prev, page: 1 }));
+    setActiveDropdown(null);
+  };
+
+  const handleSortChange = (newSort) => {
+    setSort(newSort);
+    setActiveDropdown(null);
+  };
 
   const toggleDropdown = (dropdownId) => {
     setActiveDropdown(activeDropdown === dropdownId ? null : dropdownId);
   };
 
-  const openApplyDialog = () => setIsApplyDialogOpen(true);
-  const closeApplyDialog = () => setIsApplyDialogOpen(false);
+  const openApplyDialog = (job) => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    setSelectedJob(job);
+    setIsApplyDialogOpen(true);
+  };
+
+  const closeApplyDialog = () => {
+    setIsApplyDialogOpen(false);
+    setSelectedJob(null);
+    setResumeFile(null);
+    setCoverMessage('');
+  };
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
-    if (file && file.type === 'application/pdf') {
+    if (file && (file.type === 'application/pdf' || file.type === 'application/msword' || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
       setResumeFile(file);
+    } else {
+      alert('Please upload a PDF or Word document.');
     }
   };
 
   const removeFile = () => setResumeFile(null);
 
-  const submitApplication = () => {
-    console.log('Submitting application:', { resumeFile, coverMessage });
-    closeApplyDialog();
+  const submitApplication = async () => {
+    if (!coverMessage) {
+      alert('Please provide a cover letter.');
+      return;
+    }
+
+    setApplying(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/applications/jobs/${selectedJob.id}/apply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          coverLetter: coverMessage
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert('Application submitted successfully!');
+        closeApplyDialog();
+      } else {
+        alert(data.message || 'Failed to submit application');
+      }
+    } catch (error) {
+      console.error('Error submitting application:', error);
+      alert('An error occurred while submitting application');
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const parseSkills = (skills) => {
+    if (!skills) return [];
+    if (Array.isArray(skills)) return skills;
+    try {
+      const parsed = JSON.parse(skills);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return typeof skills === 'string' ? skills.split(',').map(s => s.trim()) : [];
+    }
   };
 
   return (
@@ -51,16 +185,17 @@ const Home = () => {
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1 ring ring-transparent focus-within:ring-primary rounded-md place-content-center transition-all">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <input
                     type="text"
                     placeholder="Search jobs by title, skill..."
                     className="input pl-10 w-full outline-none border-none"
+                    value={filters.search}
+                    onChange={handleSearchChange}
                   />
                 </div>
               </div>
-
-              <button className="btn btn-primary flex gap-2">
+              <button className="btn btn-primary flex gap-2" onClick={fetchJobs}>
                 <Search className="h-4 w-4 mr-2" />
                 Search Jobs
               </button>
@@ -70,21 +205,26 @@ const Home = () => {
             <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border">
               <span className="text-sm font-medium text-muted-foreground mr-2">Filters:</span>
 
-              {/* Job Type Dropdown */}
+              {/* Job Type Filter */}
               <div className="relative">
                 <button
-                  className="btn btn-outline text-xs h-8 px-3 flex items-center"
-                  onClick={() => toggleDropdown('jobType')}
+                  className={`btn btn-outline text-xs h-8 px-3 flex items-center ${filters.type ? 'bg-accent text-accent-foreground' : ''}`}
+                  onClick={() => toggleDropdown('type')}
                 >
-                  Job Type
+                  {filters.type || 'Job Type'}
                   <ChevronDown className="ml-2 h-3 w-3" />
                 </button>
-                {activeDropdown === 'jobType' && (
-                  <div className="absolute top-full left-0 mt-2 min-w-[200px] card p-2 z-50">
+                {activeDropdown === 'type' && (
+                  <div className="absolute top-full left-0 mt-2 w-48 card p-2 shadow-lg z-10">
                     <div className="space-y-1">
-                      {['Full-time', 'Part-time', 'Contract', 'Internship'].map((type) => (
+                      {['Full-time', 'Part-time', 'Contract', 'Freelance', 'Internship'].map(type => (
                         <label key={type} className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer">
-                          <input type="checkbox" className="rounded border-input" />
+                          <input
+                            type="checkbox"
+                            className="rounded border-input"
+                            checked={filters.type === type}
+                            onChange={() => handleFilterChange('type', filters.type === type ? '' : type)}
+                          />
                           <span className="text-sm">{type}</span>
                         </label>
                       ))}
@@ -93,22 +233,27 @@ const Home = () => {
                 )}
               </div>
 
-              {/* Experience Level Dropdown */}
+              {/* Category Filter */}
               <div className="relative">
                 <button
-                  className="btn btn-outline text-xs h-8 px-3 flex items-center"
-                  onClick={() => toggleDropdown('experience')}
+                  className={`btn btn-outline text-xs h-8 px-3 flex items-center ${filters.category ? 'bg-accent text-accent-foreground' : ''}`}
+                  onClick={() => toggleDropdown('category')}
                 >
-                  Experience Level
+                  {filters.category || 'Category'}
                   <ChevronDown className="ml-2 h-3 w-3" />
                 </button>
-                {activeDropdown === 'experience' && (
-                  <div className="absolute top-full left-0 mt-2 min-w-[200px] card p-2 z-50">
+                {activeDropdown === 'category' && (
+                  <div className="absolute top-full left-0 mt-2 w-48 card p-2 shadow-lg z-10">
                     <div className="space-y-1">
-                      {['Entry Level', 'Mid Level', 'Senior Level', 'Lead/Principal'].map((level) => (
-                        <label key={level} className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer">
-                          <input type="checkbox" className="rounded border-input" />
-                          <span className="text-sm">{level}</span>
+                      {['Engineering', 'Design', 'Product', 'Marketing', 'Sales', 'HR', 'Finance'].map(cat => (
+                        <label key={cat} className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="rounded border-input"
+                            checked={filters.category === cat}
+                            onChange={() => handleFilterChange('category', filters.category === cat ? '' : cat)}
+                          />
+                          <span className="text-sm">{cat}</span>
                         </label>
                       ))}
                     </div>
@@ -116,420 +261,212 @@ const Home = () => {
                 )}
               </div>
 
-              {/* Salary Range Dropdown */}
-              <div className="relative">
+              {/* Sort */}
+              <div className="relative ml-auto">
                 <button
-                  className="btn btn-outline text-xs h-8 px-3 flex items-center"
-                  onClick={() => toggleDropdown('salary')}
+                  className="btn btn-ghost text-xs h-8 px-3 flex items-center"
+                  onClick={() => toggleDropdown('sort')}
                 >
-                  Salary Range
+                  Sort by: {sort === 'newest' ? 'Newest' : 'Oldest'}
                   <ChevronDown className="ml-2 h-3 w-3" />
                 </button>
-                {activeDropdown === 'salary' && (
-                  <div className="absolute top-full left-0 mt-2 min-w-[200px] card p-2 z-50">
+                {activeDropdown === 'sort' && (
+                  <div className="absolute top-full right-0 mt-2 w-48 card p-2 shadow-lg z-10">
                     <div className="space-y-1">
-                      {['$0 - $50k', '$50k - $100k', '$100k - $150k', '$150k+'].map((range) => (
-                        <label key={range} className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer">
-                          <input type="checkbox" className="rounded border-input" />
-                          <span className="text-sm">{range}</span>
-                        </label>
-                      ))}
+                      <button className="w-full text-left px-3 py-2 text-sm rounded hover:bg-accent" onClick={() => handleSortChange('newest')}>Newest</button>
+                      <button className="w-full text-left px-3 py-2 text-sm rounded hover:bg-accent" onClick={() => handleSortChange('oldest')}>Oldest</button>
                     </div>
                   </div>
                 )}
               </div>
-
-              {/* Skills Dropdown */}
-              <div className="relative">
-                <button
-                  className="btn btn-outline text-xs h-8 px-3 flex items-center"
-                  onClick={() => toggleDropdown('skills')}
-                >
-                  Skills
-                  <ChevronDown className="ml-2 h-3 w-3" />
-                </button>
-                {activeDropdown === 'skills' && (
-                  <div className="absolute top-full left-0 mt-2 min-w-[200px] card p-2 z-50">
-                    <div className="space-y-1">
-                      {['React', 'Node.js', 'Python', 'TypeScript'].map((skill) => (
-                        <label key={skill} className="flex items-center gap-2 p-2 hover:bg-accent rounded cursor-pointer">
-                          <input type="checkbox" className="rounded border-input" />
-                          <span className="text-sm">{skill}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <button className="btn btn-ghost text-xs h-8 px-3 text-muted-foreground hover:text-foreground">
-                Clear All
-              </button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Results Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Available Jobs</h2>
-          <p className="text-sm text-muted-foreground mt-1">Showing 1,247 results</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Sort by:</span>
-          <div className="relative">
-            <button
-              className="btn btn-outline text-sm h-9 flex items-center"
-              onClick={() => toggleDropdown('sort')}
-            >
-              Most Recent
-              <ChevronDown className="ml-2 h-3 w-3" />
-            </button>
-            {activeDropdown === 'sort' && (
-              <div className="absolute top-full right-0 mt-2 min-w-[200px] card p-2 z-50">
-                <button className="w-full text-left text-sm p-2 hover:bg-accent rounded">Most Recent</button>
-                <button className="w-full text-left text-sm p-2 hover:bg-accent rounded">Salary (High to Low)</button>
-                <button className="w-full text-left text-sm p-2 hover:bg-accent rounded">Salary (Low to High)</button>
-              </div>
-            )}
+      {/* Job Listings */}
+      <section className="space-y-4">
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
-        </div>
-      </div>
-
-      {/* Job Cards Grid */}
-      <div className="grid gap-4 md:gap-6">
-        {/* Job Card 1 */}
-        <article className="card p-6 hover:shadow-md transition-shadow">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-shrink-0">
-              <div className="h-16 w-16 rounded-lg bg-secondary flex items-center justify-center">
-                <Building2 className="h-8 w-8 text-primary" />
-              </div>
-            </div>
-            <div className="flex-1 space-y-3">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-semibold mb-1">
-                    <Link to="/jobs/1" className="hover:underline">Senior Full Stack Developer</Link>
-                  </h3>
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    <Link to="/company/profile" className="hover:text-primary font-medium">TechCorp Solutions</Link>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-4 w-4" />
-                      San Francisco, CA
-                    </span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      Posted 2 days ago
-                    </span>
+        ) : jobs.length === 0 ? (
+          <div className="text-center py-12 card">
+            <p className="text-muted-foreground">No jobs found matching your criteria.</p>
+          </div>
+        ) : (
+          jobs.map(job => (
+            <div key={job.id} className="card p-6 hover:shadow-md transition-shadow">
+              <div className="flex flex-col md:flex-row gap-6">
+                {/* Company Logo */}
+                <div className="flex-shrink-0">
+                  <div className="h-16 w-16 rounded-lg bg-secondary flex items-center justify-center overflow-hidden">
+                    {job.company.logoUrl ? (
+                      <img src={job.company.logoUrl} alt={job.company.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <Building2 className="h-8 w-8 text-primary" />
+                    )}
                   </div>
                 </div>
-              </div>
-              <p className="text-sm text-muted-foreground line-clamp-2">
-                We're looking for an experienced Full Stack Developer to join our dynamic team. You'll be working on cutting-edge web applications using React, Node.js, and cloud technologies.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <span className="badge badge-secondary">Full-time</span>
-                <span className="badge badge-outline">Remote</span>
-                <span className="badge badge-outline">React</span>
-                <span className="badge badge-outline">Node.js</span>
-                <span className="badge badge-outline">TypeScript</span>
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-semibold text-primary">$120k - $180k</span>
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Users className="h-4 w-4" />
-                    47 applicants
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  <Link to="/jobs/1" className="btn btn-outline text-sm">View Details</Link>
-                  <button onClick={openApplyDialog} className="btn btn-primary text-sm">Apply Now</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </article>
 
-        {/* Job Card 2 */}
-        <article className="card p-6 hover:shadow-md transition-shadow">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-shrink-0">
-              <div className="h-16 w-16 rounded-lg bg-secondary flex items-center justify-center">
-                <Monitor className="h-8 w-8 text-primary" />
-              </div>
-            </div>
-            <div className="flex-1 space-y-3">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-semibold mb-1">
-                    <Link to="/jobs/2" className="hover:underline">UI/UX Designer</Link>
-                  </h3>
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    <Link to="/company/profile" className="hover:text-primary font-medium">Design Studio Pro</Link>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-4 w-4" />
-                      New York, NY
-                    </span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      Posted 5 days ago
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground line-clamp-2">
-                Join our creative team to design intuitive and beautiful user experiences for our suite of SaaS products. Experience with Figma and design systems required.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <span className="badge badge-secondary">Full-time</span>
-                <span className="badge badge-outline">Hybrid</span>
-                <span className="badge badge-outline">Figma</span>
-                <span className="badge badge-outline">Design Systems</span>
-                <span className="badge badge-outline">Prototyping</span>
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-semibold text-primary">$90k - $130k</span>
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Users className="h-4 w-4" />
-                    32 applicants
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  <Link to="/jobs/2" className="btn btn-outline text-sm">View Details</Link>
-                  <button onClick={openApplyDialog} className="btn btn-primary text-sm">Apply Now</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </article>
-
-        {/* Job Card 3 */}
-        <article className="card p-6 hover:shadow-md transition-shadow">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-shrink-0">
-              <div className="h-16 w-16 rounded-lg bg-secondary flex items-center justify-center">
-                <Cpu className="h-8 w-8 text-primary" />
-              </div>
-            </div>
-            <div className="flex-1 space-y-3">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-semibold mb-1">
-                    <Link to="/jobs/3" className="hover:underline">DevOps Engineer</Link>
-                  </h3>
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    <Link to="/company/profile" className="hover:text-primary font-medium">CloudScale Inc</Link>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-4 w-4" />
-                      Austin, TX
-                    </span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      Posted 1 week ago
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground line-clamp-2">
-                Build and maintain our cloud infrastructure using AWS, Kubernetes, and Terraform. Help us scale our platform to serve millions of users worldwide.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <span className="badge badge-secondary">Full-time</span>
-                <span className="badge badge-outline">Remote</span>
-                <span className="badge badge-outline">AWS</span>
-                <span className="badge badge-outline">Kubernetes</span>
-                <span className="badge badge-outline">Docker</span>
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-semibold text-primary">$130k - $170k</span>
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Users className="h-4 w-4" />
-                    61 applicants
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  <Link to="/jobs/3" className="btn btn-outline text-sm">View Details</Link>
-                  <button onClick={openApplyDialog} className="btn btn-primary text-sm">Apply Now</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </article>
-
-        {/* Job Card 4 */}
-        <article className="card p-6 hover:shadow-md transition-shadow">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-shrink-0">
-              <div className="h-16 w-16 rounded-lg bg-secondary flex items-center justify-center">
-                <Code className="h-8 w-8 text-primary" />
-              </div>
-            </div>
-            <div className="flex-1 space-y-3">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-semibold mb-1">
-                    <Link to="/jobs/4" className="hover:underline">Frontend Developer (React)</Link>
-                  </h3>
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    <Link to="/company/profile" className="hover:text-primary font-medium">Innovate Labs</Link>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-4 w-4" />
-                      Seattle, WA
-                    </span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      Posted 3 days ago
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground line-clamp-2">
-                We're seeking a talented Frontend Developer with strong React skills to build responsive and performant web applications. You'll work closely with designers and backend engineers.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <span className="badge badge-secondary">Full-time</span>
-                <span className="badge badge-outline">On-site</span>
-                <span className="badge badge-outline">React</span>
-                <span className="badge badge-outline">JavaScript</span>
-                <span className="badge badge-outline">CSS</span>
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-semibold text-primary">$95k - $140k</span>
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Users className="h-4 w-4" />
-                    28 applicants
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  <Link to="/jobs/4" className="btn btn-outline text-sm">View Details</Link>
-                  <button onClick={openApplyDialog} className="btn btn-primary text-sm">Apply Now</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </article>
-      </div>
-
-      {/* Load More / Pagination */}
-      <div className="mt-12 flex flex-col items-center gap-4">
-        <button className="btn btn-outline">
-          Load More Jobs
-          <ChevronDown className="ml-2 h-4 w-4" />
-        </button>
-        <p className="text-sm text-muted-foreground">
-          Showing 4 of 1,247 jobs
-        </p>
-      </div>
-
-      {/* Apply Job Dialog */}
-      {isApplyDialogOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="card max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 space-y-6">
-              {/* Dialog Header */}
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-2xl font-semibold">Apply for Position</h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Complete the form below to submit your application
-                  </p>
-                </div>
-                <button onClick={closeApplyDialog} className="btn-ghost p-2">
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              {/* Resume Upload Section */}
-              <div className="space-y-3">
-                <label className="text-sm font-medium">
-                  Resume <span className="text-red-500">*</span>
-                </label>
-
-                {!resumeFile ? (
-                  <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer relative">
-                    <input
-                      type="file"
-                      accept=".pdf"
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      onChange={handleFileUpload}
-                    />
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="h-12 w-12 rounded-lg bg-secondary flex items-center justify-center">
-                        <Upload className="h-6 w-6 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Click to upload resume</p>
-                        <p className="text-xs text-muted-foreground mt-1">PDF file only (Max 5MB)</p>
-                      </div>
+                {/* Job Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
+                    <div>
+                      <h3 className="text-xl font-semibold mb-1">
+                        <Link to={`/jobs/${job.slug || job.id}`} className="hover:text-primary">
+                          {job.title}
+                        </Link>
+                      </h3>
+                      <Link to={`/companies/${job.company.slug}`} className="text-sm text-muted-foreground hover:text-primary">
+                        {job.company.name}
+                      </Link>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => openApplyDialog(job)}
+                      >
+                        Apply Now
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-4 w-4" />
+                      {job.location}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Briefcase className="h-4 w-4" />
+                      {job.type}
+                    </span>
+                    {(job.salaryMin || job.salaryMax) && (
+                      <span className="flex items-center gap-1">
+                        <DollarSign className="h-4 w-4" />
+                        {job.salaryMin && job.salaryMax
+                          ? `$${job.salaryMin} - $${job.salaryMax}`
+                          : `$${job.salaryMin || job.salaryMax}`}
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      {new Date(job.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {parseSkills(job.skills).slice(0, 5).map((skill, index) => (
+                      <span key={index} className="badge badge-secondary">
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </section>
+
+      {/* Pagination */}
+      {pagination.totalPages > 1 && (
+        <div className="flex justify-center mt-8 gap-2">
+          {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(page => (
+            <button
+              key={page}
+              className={`btn w-10 h-10 p-0 ${pagination.page === page ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setPagination(prev => ({ ...prev, page }))}
+            >
+              {page}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Apply Modal */}
+      {isApplyDialogOpen && selectedJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="card w-full max-w-lg p-6 shadow-xl animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold">Apply for {selectedJob.title}</h2>
+              <button onClick={closeApplyDialog} className="text-muted-foreground hover:text-foreground">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {/* Resume Upload */}
+              <div>
+                <label className="label block mb-2">Resume / CV</label>
+                {!resumeFile ? (
+                  <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:bg-accent/50 transition-colors">
+                    <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm font-medium mb-1">Upload your resume</p>
+                    <p className="text-xs text-muted-foreground mb-4">PDF, DOC, DOCX (Max 5MB)</p>
+                    <label className="btn btn-outline btn-sm cursor-pointer">
+                      Browse Files
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.doc,.docx"
+                        onChange={handleFileUpload}
+                      />
+                    </label>
                   </div>
                 ) : (
-                  <div className="border border-border rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
-                          <FileText className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{resumeFile.name}</p>
-                          <p className="text-xs text-muted-foreground">{(resumeFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => setResumeFile(null)} className="btn btn-outline text-xs h-8 px-3">
-                          <Upload className="h-3 w-3 mr-1" />
-                          Reupload
-                        </button>
-                        <button onClick={removeFile} className="btn btn-outline text-xs h-8 px-3 text-red-600 hover:bg-red-50">
-                          <Trash2 className="h-3 w-3 mr-1" />
-                          Remove
-                        </button>
+                  <div className="flex items-center justify-between p-3 border border-border rounded-lg bg-accent/50">
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-5 w-5 text-primary" />
+                      <div className="text-sm">
+                        <p className="font-medium truncate max-w-[200px]">{resumeFile.name}</p>
+                        <p className="text-xs text-muted-foreground">{(resumeFile.size / 1024 / 1024).toFixed(2)} MB</p>
                       </div>
                     </div>
+                    <button onClick={removeFile} className="text-muted-foreground hover:text-destructive">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 )}
-              </div>
-
-              {/* Cover Message Section */}
-              <div className="space-y-3">
-                <label htmlFor="coverMessage" className="text-sm font-medium">
-                  Cover Message <span className="text-muted-foreground">(Optional)</span>
-                </label>
-                <textarea
-                  id="coverMessage"
-                  rows="5"
-                  className="input resize-none h-auto"
-                  placeholder="Write a brief message about why you're a great fit for this role..."
-                  value={coverMessage}
-                  onChange={(e) => setCoverMessage(e.target.value)}
-                ></textarea>
-                <p className="text-xs text-muted-foreground">
-                  <span>{coverMessage.length}</span>/500 characters
+                <p className="text-xs text-muted-foreground mt-2">
+                  * Note: For this demo, your profile resume will be used if no file is uploaded here.
                 </p>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-4 border-t border-border">
-                <button onClick={closeApplyDialog} className="btn btn-outline flex-1">
+              {/* Cover Letter */}
+              <div>
+                <label htmlFor="coverLetter" className="label block mb-2">Cover Letter</label>
+                <textarea
+                  id="coverLetter"
+                  className="textarea"
+                  rows="5"
+                  placeholder="Why are you a good fit for this role?"
+                  value={coverMessage}
+                  onChange={(e) => setCoverMessage(e.target.value)}
+                ></textarea>
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-3">
+                <button onClick={closeApplyDialog} className="btn btn-outline">
                   Cancel
                 </button>
-                <button onClick={submitApplication} className="btn btn-primary flex-1">
-                  <Send className="h-4 w-4 mr-2" />
-                  Submit Application
+                <button
+                  onClick={submitApplication}
+                  className="btn btn-primary"
+                  disabled={applying}
+                >
+                  {applying ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Submit Application
+                    </>
+                  )}
                 </button>
               </div>
             </div>

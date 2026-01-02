@@ -46,28 +46,36 @@ const Navbar = () => {
         <div className="flex items-center gap-4">
           {user ? (
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center">
-                  <User className="h-4 w-4 text-primary" />
+              <Link
+                to={user.role === 'COMPANY' ? '/company/profile' : '/job-seeker/profile'}
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+              >
+                <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+                  {user.profilePictureUrl ? (
+                    <img src={user.profilePictureUrl} alt={user.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <User className="h-4 w-4 text-primary" />
+                  )}
                 </div>
-                <span className="text-sm font-medium hidden md:inline">{user.name}</span>
-              </div>
-              <button onClick={logout} className="btn btn-ghost text-sm" title="Logout">
-                <LogOut className="h-4 w-4" />
+                <span className="text-sm font-medium hidden sm:block">{user.name}</span>
+              </Link>
+              <button onClick={logout} className="btn btn-outline btn-sm">
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
               </button>
               {user.role === 'COMPANY' && (
-                <Link to="/company/create-job" className="btn btn-primary text-sm">
-                  Post a Job
+                <Link to="/company/create-job" className="btn btn-primary btn-sm">
+                  Post Job
                 </Link>
               )}
             </div>
           ) : (
             <>
-              <Link to="/login" className="btn btn-ghost text-sm">
+              <Link to="/login" className="btn btn-outline">
                 Sign In
               </Link>
-              <Link to="/register-company" className="btn btn-primary text-sm">
-                Post a Job
+              <Link to="/register" className="btn btn-primary">
+                Get Started
               </Link>
             </>
           )}

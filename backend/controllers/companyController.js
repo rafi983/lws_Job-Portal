@@ -273,21 +273,12 @@ const getCompanyJobs = async (req, res) => {
 
         // Validation for status
         const allowedStatuses = ['Active', 'Closed', 'Archived'];
-        if (status !== undefined) {
-             if (status === '' || status === 'null' || status === 'undefined') {
-                // User said "Handle situation when provided query param empty, null, undefined" - "If query is not provided that's fine"
-                // If it is provided as empty string, usually that means "no filter", but user said "if provided but is not correct return error".
-                // An empty string is NOT a valid status enum. So strict validation implies error.
-                // However, often frontend sends empty string for "All".
-                // "If query is not provided, that's fine" -> implies optional.
-                // "if provided but is not correct then return the error".
-                // I will assume strictly checking against ENUM.
-                // But specifically for 'null'/'undefined' strings or empty, I'll error if strict.
-                // Let's implement strict check against allowed values.
-                // Exception: if it is explicitly undefined in JS checks (already handled by `if (status !== undefined)`).
-
-             }
+        if (status) {
              if (!allowedStatuses.includes(status)) {
+                 // If status is provided but not valid (and not empty string which is falsy), return error?
+                 // Or just ignore?
+                 // The previous logic was strict. Let's keep it strict but allow empty string to mean "all".
+                 // Actually, `if (status)` already filters out empty string.
                  return res.status(400).json({ success: false, message: `Invalid status. Allowed: ${allowedStatuses.join(', ')}` });
              }
              where.status = status;

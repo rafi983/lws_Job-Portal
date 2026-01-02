@@ -1,29 +1,163 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ChevronRight, Building2, MapPin, Clock, Bookmark, Briefcase, DollarSign, BarChart, Users, Globe, Calendar, Linkedin, Twitter, Facebook, Link as LinkIcon, Flag, X, Upload, FileText, Trash2, Send, Layout, Cpu, Code } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import { ChevronRight, Building2, MapPin, Clock, Bookmark, Briefcase, DollarSign, Globe, Calendar, X, Upload, FileText, Trash2, Send, Loader2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const JobDetails = () => {
+  const { id } = useParams();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [job, setJob] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [isApplyDialogOpen, setIsApplyDialogOpen] = useState(false);
   const [resumeFile, setResumeFile] = useState(null);
   const [coverMessage, setCoverMessage] = useState('');
+  const [applying, setApplying] = useState(false);
+  const [hasApplied, setHasApplied] = useState(false);
+  const [applicationId, setApplicationId] = useState(null);
 
-  const openApplyDialog = () => setIsApplyDialogOpen(true);
+  useEffect(() => {
+    const fetchJobDetails = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+        const response = await fetch(`http://localhost:5000/api/jobs/${id}`, { headers });
+        const data = await response.json();
+
+        if (data.success) {
+          setJob(data.data);
+
+          // Check if user has already applied
+          if (user && data.data.applications) {
+            const myApplication = data.data.applications.find(app => app.userId === user.id);
+            if (myApplication) {
+              setHasApplied(true);
+              setApplicationId(myApplication.id);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching job details:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchJobDetails();
+  }, [id, user]);
+
+  const openApplyDialog = () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    setIsApplyDialogOpen(true);
+  };
+
   const closeApplyDialog = () => setIsApplyDialogOpen(false);
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
-    if (file && file.type === 'application/pdf') {
+    if (file && (file.type === 'application/pdf' || file.type === 'application/msword' || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
       setResumeFile(file);
+    } else {
+      alert('Please upload a PDF or Word document.');
     }
   };
 
   const removeFile = () => setResumeFile(null);
 
-  const submitApplication = () => {
-    // Handle application submission logic here
-    console.log('Submitting application:', { resumeFile, coverMessage });
-    closeApplyDialog();
+  const submitApplication = async () => {
+    if (!coverMessage) {
+      alert('Please provide a cover letter.');
+      return;
+    }
+
+    setApplying(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/applications/jobs/${id}/apply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          coverLetter: coverMessage
+          // Resume is handled via profile URL in backend for now, or we could upload here if backend supported multipart/form-data for application
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setHasApplied(true);
+        setApplicationId(data.data.id);
+        closeApplyDialog();
+        alert('Application submitted successfully!');
+      } else {
+        alert(data.message || 'Failed to submit application');
+      }
+    } catch (error) {
+      console.error('Error submitting application:', error);
+      alert('An error occurred while submitting application');
+    } finally {
+      setApplying(false);
+    }
   };
+
+  const handleWithdrawApplication = async () => {
+    if (!window.confirm('Are you sure you want to withdraw your application?')) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/applications/${applicationId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        setHasApplied(false);
+        setApplicationId(null);
+        alert('Application withdrawn successfully');
+      } else {
+        alert('Failed to withdraw application');
+      }
+    } catch (error) {
+      console.error('Error withdrawing application:', error);
+    }
+  };
+
+  const parseSkills = (skills) => {
+    if (!skills) return [];
+    if (Array.isArray(skills)) return skills;
+    try {
+      const parsed = JSON.parse(skills);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return typeof skills === 'string' ? skills.split(',').map(s => s.trim()) : [];
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!job) {
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <h1 className="text-2xl font-bold">Job not found</h1>
+        <Link to="/" className="btn btn-primary mt-4">Browse Jobs</Link>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -33,11 +167,7 @@ const JobDetails = () => {
           Jobs
         </Link>
         <ChevronRight className="h-4 w-4" />
-        <Link to="#" className="hover:text-foreground">
-          Technology
-        </Link>
-        <ChevronRight className="h-4 w-4" />
-        <span className="text-foreground">Senior Full Stack Developer</span>
+        <span className="text-foreground">{job.title}</span>
       </nav>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -47,101 +177,52 @@ const JobDetails = () => {
           <div className="card p-6">
             <div className="flex items-start gap-4">
               <div className="flex-shrink-0">
-                <div className="h-20 w-20 rounded-lg bg-secondary flex items-center justify-center">
-                  <Building2 className="h-10 w-10 text-primary" />
+                <div className="h-20 w-20 rounded-lg bg-secondary flex items-center justify-center overflow-hidden">
+                  {job.company?.logoUrl ? (
+                    <img src={job.company.logoUrl} alt={job.company.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <Building2 className="h-10 w-10 text-primary" />
+                  )}
                 </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-4 mb-3">
-                  <div>
-                    <h1 className="text-3xl font-bold mb-2">
-                      Senior Full Stack Developer
-                    </h1>
-                    <div className="flex flex-wrap items-center gap-3 text-muted-foreground">
-                      <Link to="/company/profile" className="text-lg font-medium hover:text-primary">
-                        TechCorp Solutions
-                      </Link>
-                      <span>•</span>
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-4 w-4" />
-                        San Francisco, CA
-                      </span>
-                      <span>•</span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        Posted 2 days ago
-                      </span>
-                    </div>
-                  </div>
-                  <button className="btn-ghost p-2 flex-shrink-0" title="Save job">
-                    <Bookmark className="h-6 w-6" />
-                  </button>
+              <div className="flex-1">
+                <h1 className="text-2xl font-bold mb-2">{job.title}</h1>
+                <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
+                  <Link to={`/companies/${job.company?.slug}`} className="flex items-center gap-1 hover:text-primary">
+                    <Building2 className="h-4 w-4" />
+                    {job.company?.name}
+                  </Link>
+                  <span className="flex items-center gap-1">
+                    <MapPin className="h-4 w-4" />
+                    {job.location}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-4 w-4" />
+                    {job.type}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-4 w-4" />
+                    Posted {new Date(job.createdAt).toLocaleDateString()}
+                  </span>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <span className="badge badge-secondary">Full-time</span>
-                  <span className="badge badge-outline">Remote</span>
-                  <span className="badge badge-outline">Senior Level</span>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          {/* Job Overview */}
-          <div className="card p-6">
-            <h2 className="text-xl font-semibold mb-4">Job Overview</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
-                  <Briefcase className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Job Type</p>
-                  <p className="font-medium">Full-time</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
-                  <MapPin className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Location</p>
-                  <p className="font-medium">San Francisco, CA (Remote)</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
-                  <DollarSign className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Salary</p>
-                  <p className="font-medium">$120k - $180k / year</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
-                  <BarChart className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Experience</p>
-                  <p className="font-medium">5+ years</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
-                  <Calendar className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Application Deadline</p>
-                  <p className="font-medium">December 31, 2025</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
-                  <Users className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Applicants</p>
-                  <p className="font-medium">47 applications</p>
+                <div className="flex flex-wrap gap-3">
+                  {hasApplied ? (
+                    <button
+                      className="btn btn-outline text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                      onClick={handleWithdrawApplication}
+                    >
+                      Withdraw Application
+                    </button>
+                  ) : (
+                    <button className="btn btn-primary" onClick={openApplyDialog}>
+                      Apply Now
+                    </button>
+                  )}
+                  <button className="btn btn-outline">
+                    <Bookmark className="h-4 w-4 mr-2" />
+                    Save Job
+                  </button>
                 </div>
               </div>
             </div>
@@ -149,318 +230,211 @@ const JobDetails = () => {
 
           {/* Job Description */}
           <div className="card p-6">
-            <h2 className="text-xl font-semibold mb-4">Job Description</h2>
-            <div className="prose prose-sm max-w-none space-y-4 text-foreground">
-              <p>
-                We're looking for an experienced Full Stack Developer to join our dynamic team at TechCorp Solutions. You'll be working on cutting-edge web applications using React, Node.js, and cloud technologies to build scalable solutions that impact millions of users.
-              </p>
-              <p>
-                As a Senior Full Stack Developer, you will lead the design and implementation of new features, mentor junior developers, and work closely with product managers and designers to deliver exceptional user experiences.
-              </p>
-
-              <h3 className="text-lg font-semibold mt-6 mb-3">Required Qualifications</h3>
-              <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-                <li>5+ years of professional software development experience</li>
-                <li>Strong proficiency in JavaScript/TypeScript, React, and Node.js</li>
-                <li>Experience with modern frontend frameworks and state management (Redux, MobX, etc.)</li>
-                <li>Solid understanding of RESTful APIs and microservices architecture</li>
-                <li>Experience with SQL and NoSQL databases (PostgreSQL, MongoDB, etc.)</li>
-                <li>Proficiency with Git and version control workflows</li>
-                <li>Strong problem-solving skills and attention to detail</li>
-                <li>Excellent communication and collaboration skills</li>
-              </ul>
-
-              <h3 className="text-lg font-semibold mt-6 mb-3">What We Offer</h3>
-              <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-                <li>Competitive salary range: $120,000 - $180,000 per year</li>
-                <li>Comprehensive health, dental, and vision insurance</li>
-                <li>401(k) with company match</li>
-                <li>Flexible remote work policy</li>
-                <li>Generous PTO and paid holidays</li>
-                <li>Professional development budget</li>
-                <li>Latest tech equipment and tools</li>
-                <li>Collaborative and inclusive work environment</li>
-              </ul>
+            <h2 className="text-xl font-bold mb-4">Job Description</h2>
+            <div className="prose max-w-none text-muted-foreground whitespace-pre-line">
+              {job.description}
             </div>
-          </div>
 
-          {/* Required Skills */}
-          <div className="card p-6">
-            <h2 className="text-xl font-semibold mb-4">Required Skills</h2>
-            <div className="flex flex-wrap gap-2">
-              {['React', 'Node.js', 'TypeScript', 'JavaScript', 'REST API', 'PostgreSQL', 'MongoDB', 'Git', 'Docker', 'AWS', 'Microservices', 'Redux'].map((skill) => (
-                <span key={skill} className="badge badge-secondary">{skill}</span>
-              ))}
-            </div>
-          </div>
-
-          {/* Similar Jobs */}
-          <div className="card p-6">
-            <h2 className="text-xl font-semibold mb-4">Similar Jobs</h2>
-            <div className="space-y-4">
-              {/* Similar Job 1 */}
-              <article className="border border-border rounded-lg p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0">
-                    <div className="h-12 w-12 rounded-lg bg-secondary flex items-center justify-center">
-                      <Cpu className="h-6 w-6 text-primary" />
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div>
-                        <h3 className="font-semibold mb-1">
-                          <Link to="/jobs/4" className="hover:underline">
-                            Full Stack JavaScript Developer
-                          </Link>
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          WebTech Industries
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      <span className="badge badge-secondary">Full-time</span>
-                      <span className="badge badge-outline">Remote</span>
-                      <span className="badge badge-outline">React</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          Remote
-                        </span>
-                        <span className="font-semibold text-primary">$115k - $165k</span>
-                      </div>
-                      <Link to="/jobs/4" className="btn btn-outline text-xs h-8">
-                        View Details
-                      </Link>
-                    </div>
-                  </div>
+            {job.requirements && (
+              <>
+                <h3 className="text-lg font-semibold mt-6 mb-3">Requirements</h3>
+                <div className="prose max-w-none text-muted-foreground whitespace-pre-line">
+                  {job.requirements}
                 </div>
-              </article>
+              </>
+            )}
 
-              {/* Similar Job 2 */}
-              <article className="border border-border rounded-lg p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0">
-                    <div className="h-12 w-12 rounded-lg bg-secondary flex items-center justify-center">
-                      <Code className="h-6 w-6 text-primary" />
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div>
-                        <h3 className="font-semibold mb-1">
-                          <Link to="/jobs/2" className="hover:underline">
-                            Frontend Developer
-                          </Link>
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          Innovate Labs
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      <span className="badge badge-secondary">Full-time</span>
-                      <span className="badge badge-outline">On-site</span>
-                      <span className="badge badge-outline">React</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          Seattle, WA
-                        </span>
-                        <span className="font-semibold text-primary">$95k - $140k</span>
-                      </div>
-                      <Link to="/jobs/2" className="btn btn-outline text-xs h-8">
-                        View Details
-                      </Link>
-                    </div>
-                  </div>
+            {job.benefits && (
+              <>
+                <h3 className="text-lg font-semibold mt-6 mb-3">Benefits</h3>
+                <div className="prose max-w-none text-muted-foreground whitespace-pre-line">
+                  {job.benefits}
                 </div>
-              </article>
-            </div>
+              </>
+            )}
           </div>
+
+          {/* Skills */}
+          {job.skills && parseSkills(job.skills).length > 0 && (
+            <div className="card p-6">
+              <h2 className="text-xl font-bold mb-4">Required Skills</h2>
+              <div className="flex flex-wrap gap-2">
+                {parseSkills(job.skills).map((skill, index) => (
+                  <span key={index} className="badge badge-secondary">
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Sidebar Column */}
-        <div className="lg:col-span-1 space-y-6">
-          {/* Apply Card */}
-          <div className="card p-6 sticky top-24">
-            <h3 className="text-lg font-semibold mb-4">Interested in this job?</h3>
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Job Overview */}
+          <div className="card p-6">
+            <h3 className="font-semibold mb-4">Job Overview</h3>
             <div className="space-y-4">
-              <button onClick={openApplyDialog} className="btn btn-primary w-full">
-                Apply Now
-              </button>
-              <button className="btn btn-outline w-full">
-                <Bookmark className="h-4 w-4 mr-2" />
-                Save Job
-              </button>
-              <div className="text-center text-xs text-muted-foreground mt-4">
-                <p>Application deadline: Dec 31, 2025</p>
-                <p className="mt-1">Posted 2 days ago</p>
+              <div className="flex items-start gap-3">
+                <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">Date Posted</p>
+                  <p className="text-sm text-muted-foreground">{new Date(job.createdAt).toLocaleDateString()}</p>
+                </div>
               </div>
-            </div>
-
-            <div className="mt-6 pt-6 border-t border-border">
-              <h4 className="font-medium mb-3">Share this job</h4>
-              <div className="flex gap-2 justify-center">
-                <button className="btn btn-outline h-9 w-9 p-0 rounded-full">
-                  <Linkedin className="h-4 w-4" />
-                </button>
-                <button className="btn btn-outline h-9 w-9 p-0 rounded-full">
-                  <Twitter className="h-4 w-4" />
-                </button>
-                <button className="btn btn-outline h-9 w-9 p-0 rounded-full">
-                  <Facebook className="h-4 w-4" />
-                </button>
-                <button className="btn btn-outline h-9 w-9 p-0 rounded-full">
-                  <LinkIcon className="h-4 w-4" />
-                </button>
+              <div className="flex items-start gap-3">
+                <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">Expiration Date</p>
+                  <p className="text-sm text-muted-foreground">
+                    {job.deadline ? new Date(job.deadline).toLocaleDateString() : 'Open until filled'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">Location</p>
+                  <p className="text-sm text-muted-foreground">{job.location}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <Briefcase className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">Job Title</p>
+                  <p className="text-sm text-muted-foreground">{job.title}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <DollarSign className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">Salary</p>
+                  <p className="text-sm text-muted-foreground">
+                    {job.salaryMin && job.salaryMax
+                      ? `$${job.salaryMin} - $${job.salaryMax} / ${job.salaryPeriod}`
+                      : 'Competitive'}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Company Card */}
+          {/* Company Info */}
           <div className="card p-6">
-            <h3 className="text-lg font-semibold mb-4">About the Company</h3>
+            <h3 className="font-semibold mb-4">About Company</h3>
             <div className="flex items-center gap-3 mb-4">
-              <div className="h-12 w-12 rounded-lg bg-secondary flex items-center justify-center">
-                <Building2 className="h-6 w-6 text-primary" />
+              <div className="h-12 w-12 rounded-lg bg-secondary flex items-center justify-center overflow-hidden">
+                {job.company?.logoUrl ? (
+                  <img src={job.company.logoUrl} alt={job.company.name} className="h-full w-full object-cover" />
+                ) : (
+                  <Building2 className="h-6 w-6 text-primary" />
+                )}
               </div>
               <div>
-                <h4 className="font-medium">TechCorp Solutions</h4>
-                <Link to="/company/profile" className="text-sm text-primary hover:underline">
+                <p className="font-medium">{job.company?.name}</p>
+                <Link to={`/companies/${job.company?.slug}`} className="text-sm text-primary hover:underline">
                   View Profile
                 </Link>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              TechCorp Solutions is a leading technology company specializing in enterprise software solutions. We empower businesses through innovative technology.
-            </p>
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center gap-3">
-                <Globe className="h-4 w-4 text-muted-foreground" />
-                <a href="#" className="hover:underline">www.techcorp.com</a>
-              </div>
-              <div className="flex items-center gap-3">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <span>500-1000 employees</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-                <span>San Francisco, CA</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Report Job */}
-          <div className="text-center">
-            <button className="text-sm text-muted-foreground hover:text-red-600 flex items-center justify-center gap-2 mx-auto">
-              <Flag className="h-4 w-4" />
-              Report this job
-            </button>
+            {job.company?.websiteUrl && (
+              <a
+                href={job.company.websiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-outline w-full"
+              >
+                <Globe className="h-4 w-4 mr-2" />
+                Visit Website
+              </a>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Apply Job Dialog */}
+      {/* Apply Modal */}
       {isApplyDialogOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="card max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 space-y-6">
-              {/* Dialog Header */}
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-2xl font-semibold">Apply for Position</h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Senior Full Stack Developer at TechCorp Solutions
-                  </p>
-                </div>
-                <button onClick={closeApplyDialog} className="btn-ghost p-2">
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="card w-full max-w-lg p-6 shadow-xl animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold">Apply for {job.title}</h2>
+              <button onClick={closeApplyDialog} className="text-muted-foreground hover:text-foreground">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
 
-              {/* Resume Upload Section */}
-              <div className="space-y-3">
-                <label className="text-sm font-medium">
-                  Resume <span className="text-red-500">*</span>
-                </label>
-
+            <div className="space-y-6">
+              {/* Resume Upload - Note: Backend currently uses profile resume, but UI shows upload for completeness/future */}
+              <div>
+                <label className="label block mb-2">Resume / CV</label>
                 {!resumeFile ? (
-                  <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer relative">
-                    <input
-                      type="file"
-                      accept=".pdf"
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      onChange={handleFileUpload}
-                    />
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="h-12 w-12 rounded-lg bg-secondary flex items-center justify-center">
-                        <Upload className="h-6 w-6 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Click to upload resume</p>
-                        <p className="text-xs text-muted-foreground mt-1">PDF file only (Max 5MB)</p>
-                      </div>
-                    </div>
+                  <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:bg-accent/50 transition-colors">
+                    <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm font-medium mb-1">Upload your resume</p>
+                    <p className="text-xs text-muted-foreground mb-4">PDF, DOC, DOCX (Max 5MB)</p>
+                    <label className="btn btn-outline btn-sm cursor-pointer">
+                      Browse Files
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.doc,.docx"
+                        onChange={handleFileUpload}
+                      />
+                    </label>
                   </div>
                 ) : (
-                  <div className="border border-border rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
-                          <FileText className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{resumeFile.name}</p>
-                          <p className="text-xs text-muted-foreground">{(resumeFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => setResumeFile(null)} className="btn btn-outline text-xs h-8 px-3">
-                          <Upload className="h-3 w-3 mr-1" />
-                          Reupload
-                        </button>
-                        <button onClick={removeFile} className="btn btn-outline text-xs h-8 px-3 text-red-600 hover:bg-red-50">
-                          <Trash2 className="h-3 w-3 mr-1" />
-                          Remove
-                        </button>
+                  <div className="flex items-center justify-between p-3 border border-border rounded-lg bg-accent/50">
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-5 w-5 text-primary" />
+                      <div className="text-sm">
+                        <p className="font-medium truncate max-w-[200px]">{resumeFile.name}</p>
+                        <p className="text-xs text-muted-foreground">{(resumeFile.size / 1024 / 1024).toFixed(2)} MB</p>
                       </div>
                     </div>
+                    <button onClick={removeFile} className="text-muted-foreground hover:text-destructive">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 )}
-              </div>
-
-              {/* Cover Message Section */}
-              <div className="space-y-3">
-                <label htmlFor="coverMessage" className="text-sm font-medium">
-                  Cover Message <span className="text-muted-foreground">(Optional)</span>
-                </label>
-                <textarea
-                  id="coverMessage"
-                  rows="5"
-                  className="input resize-none h-auto"
-                  placeholder="Write a brief message about why you're a great fit for this role..."
-                  value={coverMessage}
-                  onChange={(e) => setCoverMessage(e.target.value)}
-                ></textarea>
-                <p className="text-xs text-muted-foreground">
-                  <span>{coverMessage.length}</span>/500 characters
+                <p className="text-xs text-muted-foreground mt-2">
+                  * Note: For this demo, your profile resume will be used if no file is uploaded here.
                 </p>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-4 border-t border-border">
-                <button onClick={closeApplyDialog} className="btn btn-outline flex-1">
+              {/* Cover Letter */}
+              <div>
+                <label htmlFor="coverLetter" className="label block mb-2">Cover Letter</label>
+                <textarea
+                  id="coverLetter"
+                  className="textarea"
+                  rows="5"
+                  placeholder="Why are you a good fit for this role?"
+                  value={coverMessage}
+                  onChange={(e) => setCoverMessage(e.target.value)}
+                ></textarea>
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-3">
+                <button onClick={closeApplyDialog} className="btn btn-outline">
                   Cancel
                 </button>
-                <button onClick={submitApplication} className="btn btn-primary flex-1">
-                  <Send className="h-4 w-4 mr-2" />
-                  Submit Application
+                <button
+                  onClick={submitApplication}
+                  className="btn btn-primary"
+                  disabled={applying}
+                >
+                  {applying ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Submit Application
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -472,4 +446,3 @@ const JobDetails = () => {
 };
 
 export default JobDetails;
-
